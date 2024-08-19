@@ -2,6 +2,7 @@ use futures::{Stream, StreamExt};
 use globset::GlobSet;
 use std::{
     collections::VecDeque,
+    fmt::Debug,
     future::Future,
     mem,
     path::{Path, PathBuf},
@@ -10,6 +11,7 @@ use std::{
 };
 use tokio::fs::{read_dir, symlink_metadata};
 use tokio_stream::wrappers::ReadDirStream;
+use tracing::trace;
 
 /// stream returning all git directories under `rootdir`
 pub struct GitDirs {
@@ -31,22 +33,25 @@ impl GitDirs {
         I: IntoIterator<Item = P>,
         P: AsRef<Path>,
     {
-        Self {
+        let this = Self {
             _excludes: excludes,
             pending_dirs: VecDeque::from_iter(
                 rootdirs.into_iter().map(|p| p.as_ref().to_path_buf()),
             ),
             state: GitDirsState::Initial,
-        }
+        };
+        trace!("GitDirs::new pending_dirs={:?}", this.pending_dirs);
+        this
     }
 }
 
+#[tracing::instrument(level = "trace")]
 async fn read_subdirs<P>(dir: P) -> Vec<PathBuf>
 where
-    P: AsRef<Path>,
+    P: AsRef<Path> + Debug,
 {
     let dir = dir.as_ref();
-    println!("queue_subdirs {:?}", dir);
+    // println!("queue_subdirs {:?}", dir);
     if let Ok(rd) = read_dir(dir).await {
         let rds = ReadDirStream::new(rd);
         rds.filter_map(|entry| async move {
@@ -65,12 +70,12 @@ where
     }
 }
 
+#[tracing::instrument(level = "trace")]
 async fn is_dir<P>(path: P) -> bool
 where
-    P: AsRef<Path>,
+    P: AsRef<Path> + Debug,
 {
     let path = path.as_ref();
-    println!("is_dir({:?})", path);
     symlink_metadata(path).await.is_ok_and(|m| m.is_dir())
 }
 
@@ -81,63 +86,49 @@ impl Stream for GitDirs {
         let mut state = GitDirsState::Initial;
         mem::swap(&mut self.state, &mut state);
         match state {
-            GitDirsState::Initial => {
-                println!("initial state");
-                match self.pending_dirs.pop_front() {
-                    None => {
-                        println!("no directories left, returning None");
-                        Poll::Ready(None)
-                    }
-                    Some(dir) => {
-                        println!("checking {:?}", &dir);
-
-                        let gitdir_candidate = dir.join(".git");
-                        let s = GitDirsState::IsGitDir(dir, Box::pin(is_dir(gitdir_candidate)));
-                        self.state = s;
-                        cx.waker().wake_by_ref();
-                        Poll::Pending
-                    }
+            GitDirsState::Initial => match self.pending_dirs.pop_front() {
+                None => {
+                    trace!("GitDirs::Stream done");
+                    Poll::Ready(None)
                 }
-            }
-            GitDirsState::IsGitDir(path, mut is_git_dir) => {
-                println!("is_git_dir state");
-                match is_git_dir.as_mut().poll(cx) {
-                    Poll::Ready(is_dir) => {
-                        println!("ready with {}", is_dir);
-                        if is_dir {
-                            Poll::Ready(Some(path))
-                        } else {
-                            println!("queuing {:?}", &path);
-                            let q = Box::pin(read_subdirs(path));
-                            let mut state = GitDirsState::QueueSubdirs(q);
-                            mem::swap(&mut self.state, &mut state);
-                            cx.waker().wake_by_ref();
-                            Poll::Pending
-                        }
-                    }
-                    Poll::Pending => {
-                        println!("not ready");
-                        let mut state = GitDirsState::IsGitDir(path, is_git_dir);
+                Some(dir) => {
+                    let gitdir_candidate = dir.join(".git");
+                    let s = GitDirsState::IsGitDir(dir, Box::pin(is_dir(gitdir_candidate)));
+                    self.state = s;
+                    cx.waker().wake_by_ref();
+                    Poll::Pending
+                }
+            },
+            GitDirsState::IsGitDir(path, mut is_git_dir) => match is_git_dir.as_mut().poll(cx) {
+                Poll::Ready(is_dir) => {
+                    if is_dir {
+                        trace!("GitDirs::Stream yield {:?}", &path);
+                        Poll::Ready(Some(path))
+                    } else {
+                        trace!("GitDirs::Stream queue {:?}", path);
+                        let q = Box::pin(read_subdirs(path));
+                        let mut state = GitDirsState::QueueSubdirs(q);
                         mem::swap(&mut self.state, &mut state);
                         cx.waker().wake_by_ref();
                         Poll::Pending
                     }
                 }
-            }
+                Poll::Pending => {
+                    let mut state = GitDirsState::IsGitDir(path, is_git_dir);
+                    mem::swap(&mut self.state, &mut state);
+                    Poll::Pending
+                }
+            },
             GitDirsState::QueueSubdirs(mut queue_subdirs) => {
-                println!("queue subdirs");
                 match queue_subdirs.as_mut().poll(cx) {
                     Poll::Ready(subdirs) => {
-                        println!("queue_subdirs done with {:?}", subdirs);
                         self.pending_dirs.extend(subdirs);
                         cx.waker().wake_by_ref();
                         Poll::Pending
                     }
                     Poll::Pending => {
-                        println!("still waiting for queue_subdirs");
                         let mut state = GitDirsState::QueueSubdirs(queue_subdirs);
                         mem::swap(&mut self.state, &mut state);
-                        cx.waker().wake_by_ref();
                         Poll::Pending
                     }
                 }
