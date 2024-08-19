@@ -1,23 +1,28 @@
-use async_stream::stream;
-use futures::Stream;
+use futures::{Stream, StreamExt};
 use globset::GlobSet;
 use std::{
     collections::VecDeque,
+    future::Future,
+    mem,
     path::{Path, PathBuf},
+    pin::Pin,
+    task::{Context, Poll},
 };
-use tokio::{
-    fs::read_dir,
-    sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
-    task::JoinHandle,
-};
-use tokio_stream::StreamExt;
-use tokio_util::sync::CancellationToken;
+use tokio::fs::{read_dir, symlink_metadata};
+use tokio_stream::wrappers::ReadDirStream;
 
 /// stream returning all git directories under `rootdir`
-#[derive(Debug)]
 pub struct GitDirs {
-    excludes: GlobSet,
+    _excludes: GlobSet,
     pending_dirs: VecDeque<PathBuf>,
+    state: GitDirsState,
+}
+
+// futures we could be awaiting
+enum GitDirsState {
+    Initial,
+    IsGitDir(PathBuf, Pin<Box<dyn Future<Output = bool>>>),
+    QueueSubdirs(Pin<Box<dyn Future<Output = Vec<PathBuf>>>>),
 }
 
 impl GitDirs {
@@ -27,56 +32,116 @@ impl GitDirs {
         P: AsRef<Path>,
     {
         Self {
-            excludes,
+            _excludes: excludes,
             pending_dirs: VecDeque::from_iter(
                 rootdirs.into_iter().map(|p| p.as_ref().to_path_buf()),
             ),
+            state: GitDirsState::Initial,
         }
     }
+}
 
-    async fn queue_subdirs<P>(&mut self, dir: P)
-    where
-        P: AsRef<Path>,
-    {
-        let dir = dir.as_ref();
-        if let Ok(rd) = read_dir(dir).await {
-            let mut rds = tokio_stream::wrappers::ReadDirStream::new(rd);
-            while let Some(entry) = rds.next().await {
-                // let paths = rd.filter_map(|entry| {
-                let path = entry.ok().and_then(|entry| {
+async fn read_subdirs<P>(dir: P) -> Vec<PathBuf>
+where
+    P: AsRef<Path>,
+{
+    let dir = dir.as_ref();
+    println!("queue_subdirs {:?}", dir);
+    if let Ok(rd) = read_dir(dir).await {
+        let rds = ReadDirStream::new(rd);
+        rds.filter_map(|entry| async move {
+            match entry {
+                Ok(entry) => {
                     let entry_path = dir.join(entry.path());
-                    (!entry_path.is_symlink() && entry_path.is_dir()).then_some(entry_path)
-                });
-
-                if let Some(path) = path {
-                    self.pending_dirs.push_back(path);
+                    is_dir(&entry_path).await.then_some(entry_path)
                 }
+                Err(_) => None,
             }
-        }
+        })
+        .collect::<Vec<PathBuf>>()
+        .await
+    } else {
+        Vec::default()
     }
+}
+
+async fn is_dir<P>(path: P) -> bool
+where
+    P: AsRef<Path>,
+{
+    let path = path.as_ref();
+    println!("is_dir({:?})", path);
+    symlink_metadata(path).await.is_ok_and(|m| m.is_dir())
 }
 
 impl Stream for GitDirs {
     type Item = PathBuf;
 
-    fn poll_next(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        std::task::Poll::Ready(self.pending_dirs.pop_front())
-    }
-}
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut state = GitDirsState::Initial;
+        mem::swap(&mut self.state, &mut state);
+        match state {
+            GitDirsState::Initial => {
+                println!("initial state");
+                match self.pending_dirs.pop_front() {
+                    None => {
+                        println!("no directories left, returning None");
+                        Poll::Ready(None)
+                    }
+                    Some(dir) => {
+                        println!("checking {:?}", &dir);
 
-pub fn git_dirs<I, P>(_rootdirs: I, _excludes: GlobSet) -> impl Stream<Item = PathBuf> {
-    stream! {
-        yield PathBuf::from("/home/sjg/vc/sjg/dev.rust/async-playpen");
-        yield PathBuf::from("/home/sjg/vc/sjg/dev.rust/playpen");
+                        let gitdir_candidate = dir.join(".git");
+                        let s = GitDirsState::IsGitDir(dir, Box::pin(is_dir(gitdir_candidate)));
+                        self.state = s;
+                        cx.waker().wake_by_ref();
+                        Poll::Pending
+                    }
+                }
+            }
+            GitDirsState::IsGitDir(path, mut is_git_dir) => {
+                println!("is_git_dir state");
+                match is_git_dir.as_mut().poll(cx) {
+                    Poll::Ready(is_dir) => {
+                        println!("ready with {}", is_dir);
+                        if is_dir {
+                            Poll::Ready(Some(path))
+                        } else {
+                            println!("queuing {:?}", &path);
+                            let q = Box::pin(read_subdirs(path));
+                            let mut state = GitDirsState::QueueSubdirs(q);
+                            mem::swap(&mut self.state, &mut state);
+                            cx.waker().wake_by_ref();
+                            Poll::Pending
+                        }
+                    }
+                    Poll::Pending => {
+                        println!("not ready");
+                        let mut state = GitDirsState::IsGitDir(path, is_git_dir);
+                        mem::swap(&mut self.state, &mut state);
+                        cx.waker().wake_by_ref();
+                        Poll::Pending
+                    }
+                }
+            }
+            GitDirsState::QueueSubdirs(mut queue_subdirs) => {
+                println!("queue subdirs");
+                match queue_subdirs.as_mut().poll(cx) {
+                    Poll::Ready(subdirs) => {
+                        println!("queue_subdirs done with {:?}", subdirs);
+                        self.pending_dirs.extend(subdirs);
+                        cx.waker().wake_by_ref();
+                        Poll::Pending
+                    }
+                    Poll::Pending => {
+                        println!("still waiting for queue_subdirs");
+                        let mut state = GitDirsState::QueueSubdirs(queue_subdirs);
+                        mem::swap(&mut self.state, &mut state);
+                        cx.waker().wake_by_ref();
+                        Poll::Pending
+                    }
+                }
+            }
+        }
     }
-    // WalkDir::new(rootdir)
-    //     .into_iter()
-    //     .filter_entry(|e| e.file_type().is_dir() && !excludes.is_match(e.path()))
-    //     .filter_map(|e| match e {
-    //         Ok(e) if e.file_name() == ".git" => Some(e.into_path()),
-    //         _ => None,
-    //     })
 }

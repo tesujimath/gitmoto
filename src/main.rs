@@ -1,7 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
-
 use std::io::Result;
 
 use filesystem::GitDirs;
@@ -12,10 +8,7 @@ pub mod filesystem; // Filesystem traversal
 
 async fn tokio_main() -> Result<()> {
     let mut g = GitDirs::new(
-        [
-            "/home/sjg/vc/sjg/dev.rust/async-playpen",
-            "/home/sjg/vc/sjg/dev.rust/playpen",
-        ],
+        ["/home/sjg/vc/sjg/dev.rust/playpen", "/home/sjg/junk"],
         GlobSet::empty(),
     );
 
