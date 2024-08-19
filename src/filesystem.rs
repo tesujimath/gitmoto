@@ -6,9 +6,11 @@ use std::{
     path::{Path, PathBuf},
 };
 use tokio::{
+    fs::read_dir,
     sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
     task::JoinHandle,
 };
+use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 
 /// stream returning all git directories under `rootdir`
@@ -32,21 +34,24 @@ impl GitDirs {
         }
     }
 
-    // TODO this needs to be use tokio_fs:read_dir, which returns a stream
-    fn queue_subdirs<P>(&mut self, dir: P)
+    async fn queue_subdirs<P>(&mut self, dir: P)
     where
         P: AsRef<Path>,
     {
         let dir = dir.as_ref();
-        if let Ok(d) = dir.read_dir() {
-            let paths = d.filter_map(|entry| {
-                entry.ok().and_then(|entry| {
+        if let Ok(rd) = read_dir(dir).await {
+            let mut rds = tokio_stream::wrappers::ReadDirStream::new(rd);
+            while let Some(entry) = rds.next().await {
+                // let paths = rd.filter_map(|entry| {
+                let path = entry.ok().and_then(|entry| {
                     let entry_path = dir.join(entry.path());
                     (!entry_path.is_symlink() && entry_path.is_dir()).then_some(entry_path)
-                })
-            });
+                });
 
-            self.pending_dirs.extend(paths);
+                if let Some(path) = path {
+                    self.pending_dirs.push_back(path);
+                }
+            }
         }
     }
 }
