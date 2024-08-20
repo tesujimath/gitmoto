@@ -6,7 +6,7 @@ use tracing_subscriber::EnvFilter;
 
 async fn tokio_main() -> Result<()> {
     let mut local = filesystem::GitDirs::new(["/home/sjg/vc", "/home/sjg/junk"], GlobSet::empty());
-    let mut remote = ssh::GitDirs::connect("git@localhost", ["."]).await?;
+    let mut remote = ssh::GitDirs::connect("git", "localhost", ["."]).await?;
 
     // while let Some(dir) = local.next().await {
     //     println!("{}", dir.to_string_lossy());

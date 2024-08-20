@@ -8,10 +8,12 @@ authors = ["Simon Guest <simon.guest@tesujimath.org>"]
 
 [dependencies]
 anyhow = "1.0.86"
+async-trait = "0.1.81"
 futures = "0.3.28"
 globset = "0.4.14"
-openssh = { version = "0.11.0", features = ["native-mux"] }
 pin-project = "1.1.5"
+russh = "0.45.0"
+russh-sftp = "2.0.3"
 tokio = { version = "1.32.0", features = ["full"] }
 tokio-stream = { version = "0.1.15", features = ["fs"] }
 tracing = "0.1.40"
