@@ -1,18 +1,16 @@
 use anyhow::Result;
 
-use filesystem::GitDirs;
 use globset::GlobSet;
 use tokio_stream::StreamExt;
 use tracing_subscriber::EnvFilter;
 
-pub mod filesystem; // Filesystem traversal
-
 async fn tokio_main() -> Result<()> {
-    let mut g = GitDirs::new(["/home/sjg/vc", "/home/sjg/junk"], GlobSet::empty());
+    let mut local = filesystem::GitDirs::new(["/home/sjg/vc", "/home/sjg/junk"], GlobSet::empty());
+    let mut remote = ssh::GitDirs::connect("git@localhost", ["."]).await?;
 
-    while let Some(dir) = g.next().await {
-        println!("{}", dir.to_string_lossy());
-    }
+    // while let Some(dir) = local.next().await {
+    //     println!("{}", dir.to_string_lossy());
+    // }
     Ok(())
 }
 
@@ -30,3 +28,6 @@ async fn main() -> Result<()> {
         Ok(())
     }
 }
+
+pub mod filesystem; // Filesystem traversal
+pub mod ssh; // ssh remote traversal

@@ -51,7 +51,6 @@ where
     P: AsRef<Path> + Debug,
 {
     let dir = dir.as_ref();
-    // println!("queue_subdirs {:?}", dir);
     if let Ok(rd) = read_dir(dir).await {
         let rds = ReadDirStream::new(rd);
         rds.filter_map(|entry| async move {
