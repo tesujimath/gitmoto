@@ -6,7 +6,7 @@ use russh::{
     keys::{agent::client::AgentClient, key},
     ChannelId,
 };
-use russh_sftp::client::SftpSession;
+use russh_sftp::client::{rawsession::SftpResult, SftpSession};
 use std::{
     collections::VecDeque,
     fmt::Debug,
@@ -31,6 +31,14 @@ pub struct GitDirs {
     state: GitDirsState,
 }
 
+impl Debug for GitDirs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!(
+            "GitDirs user={} host={} pending_dirs={:?}",
+            &self.user, &self.host, &self.pending_dirs
+        ))
+    }
+}
 // futures we could be awaiting
 enum GitDirsState {
     Initial,
@@ -87,6 +95,43 @@ impl GitDirs {
         };
 
         Ok(this)
+    }
+
+    #[tracing::instrument(level = "trace")]
+    async fn read_subdirs<P>(self, dir: P) -> Vec<String>
+    where
+        P: Into<String> + Debug,
+    {
+        let dir = dir.into();
+        if let Ok(rd) = self.sftp_session.read_dir(dir.as_str()).await {
+            rd.filter_map(|entry| {
+                entry
+                    .file_type()
+                    .is_dir()
+                    .then_some(entry.file_name())
+                    .and_then(|file_name| {
+                        Path::new(&dir)
+                            .join(file_name)
+                            .into_os_string()
+                            .into_string()
+                            .ok()
+                    })
+            })
+            .collect::<Vec<_>>()
+        } else {
+            Vec::default()
+        }
+    }
+
+    #[tracing::instrument(level = "trace")]
+    async fn is_dir<P>(&self, path: P) -> bool
+    where
+        P: Into<String> + Debug,
+    {
+        self.sftp_session
+            .symlink_metadata(path)
+            .await
+            .is_ok_and(|m| m.is_dir())
     }
 }
 
