@@ -62,12 +62,8 @@ impl GitDirs {
         let sh = Client {};
         let mut session = russh::client::connect(Arc::new(config), (host, 22), sh).await?;
 
-        // first try with agent auth
         let (_, authorized) = session.authenticate_future(user, id, agent).await;
-        let authorized = authorized?;
-        debug!("authenticate_future {:?}", authorized);
-
-        if !authorized {
+        if !authorized? {
             return Err(anyhow!("failed to authorize ssh session"));
         }
 
@@ -119,7 +115,7 @@ impl client::Handler for Client {
         data: &[u8],
         _session: &mut client::Session,
     ) -> Result<(), Self::Error> {
-        info!("data on channel {:?}: {}", channel, data.len());
+        info!("{} bytes received on {:?}", data.len(), channel);
         Ok(())
     }
 }
