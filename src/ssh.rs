@@ -50,23 +50,17 @@ impl GitDirs {
         let host = host.as_ref();
 
         let mut agent = AgentClient::connect_env().await?;
-        let mut identities = agent.request_identities().await?;
-        for (i, id) in identities.iter().enumerate() {
-            debug!(
-                "agent supplied identity {} {} {}",
-                i,
-                id.name(),
-                id.fingerprint()
-            );
-        }
+        let identities = agent.request_identities().await?;
+        // find a compatible identity
+        let id = identities
+            .into_iter()
+            .find(|id| id.name() == "ssh-ed25519")
+            .ok_or(anyhow!("ssh agent has no ed25519 identities"))?;
+        debug!("using identity {} {}", id.name(), id.fingerprint());
 
         let config = russh::client::Config::default();
         let sh = Client {};
         let mut session = russh::client::connect(Arc::new(config), (host, 22), sh).await?;
-
-        let id = identities
-            .pop()
-            .ok_or(anyhow!("ssh agent has no identities"))?;
 
         // first try with agent auth
         let (_, authorized) = session.authenticate_future(user, id, agent).await;
