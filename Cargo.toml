@@ -12,7 +12,7 @@ async-trait = "0.1.81"
 futures = "0.3.28"
 globset = "0.4.14"
 pin-project = "1.1.5"
-russh = "0.45.0"
+russh = { version = "0.45.0", features = ["openssl"] }
 russh-sftp = "2.0.3"
 tokio = { version = "1.32.0", features = ["full"] }
 tokio-stream = { version = "0.1.15", features = ["fs"] }
