@@ -6,12 +6,18 @@ use tokio_stream::StreamExt;
 use tracing_subscriber::EnvFilter;
 
 async fn tokio_main() -> Result<()> {
-    let mut local = filesystem::git_dirs(["/home/sjg/vc", "/home/sjg/junk"], GlobSet::empty());
-    let mut remote = ssh::GitDirs::connect("git", "localhost", ["."]).await?;
+    let local = filesystem::git_dirs(["/home/sjg/vc", "/home/sjg/junk"], GlobSet::empty());
     pin_mut!(local);
 
-    while let Some(dir) = local.next().await {
-        println!("{}", dir.to_string_lossy());
+    let remote = ssh::git_dirs("git", "localhost", ["."], GlobSet::empty());
+    pin_mut!(remote);
+
+    // while let Some(dir) = local.next().await {
+    //     println!("{}", dir.to_string_lossy());
+    // }
+
+    while let Some(dir) = remote.next().await {
+        println!("{}", dir);
     }
     Ok(())
 }
