@@ -1,16 +1,18 @@
 use anyhow::Result;
 
+use futures::pin_mut;
 use globset::GlobSet;
 use tokio_stream::StreamExt;
 use tracing_subscriber::EnvFilter;
 
 async fn tokio_main() -> Result<()> {
-    let mut local = filesystem::GitDirs::new(["/home/sjg/vc", "/home/sjg/junk"], GlobSet::empty());
+    let mut local = filesystem::git_dirs(["/home/sjg/vc", "/home/sjg/junk"], GlobSet::empty());
     let mut remote = ssh::GitDirs::connect("git", "localhost", ["."]).await?;
+    pin_mut!(local);
 
-    // while let Some(dir) = local.next().await {
-    //     println!("{}", dir.to_string_lossy());
-    // }
+    while let Some(dir) = local.next().await {
+        println!("{}", dir.to_string_lossy());
+    }
     Ok(())
 }
 

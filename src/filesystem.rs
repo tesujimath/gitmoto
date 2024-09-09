@@ -1,47 +1,37 @@
+use async_stream::stream;
 use futures::{Stream, StreamExt};
 use globset::GlobSet;
 use std::{
     collections::VecDeque,
     fmt::Debug,
-    future::Future,
-    mem,
     path::{Path, PathBuf},
-    pin::Pin,
-    task::{Context, Poll},
 };
 use tokio::fs::{read_dir, symlink_metadata};
 use tokio_stream::wrappers::ReadDirStream;
 use tracing::trace;
 
-/// stream returning all git directories under `rootdir`
-pub struct GitDirs {
-    _excludes: GlobSet,
-    pending_dirs: VecDeque<PathBuf>,
-    state: GitDirsState,
-}
+pub fn git_dirs<I, P>(rootdirs: I, _excludes: GlobSet) -> impl Stream<Item = PathBuf>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    let mut pending_dirs =
+        VecDeque::from_iter(rootdirs.into_iter().map(|p| p.as_ref().to_path_buf()));
+    trace!("git_dirs(pending_dirs={:?})", pending_dirs);
 
-// futures we could be awaiting
-enum GitDirsState {
-    Initial,
-    IsGitDir(PathBuf, Pin<Box<dyn Future<Output = bool>>>),
-    ReadSubdirs(Pin<Box<dyn Future<Output = Vec<PathBuf>>>>),
-}
+    stream! {
+        while let Some(dir)  = pending_dirs.pop_front() {
+            let gitdir_candidate = dir.join(".git");
 
-impl GitDirs {
-    pub fn new<I, P>(rootdirs: I, excludes: GlobSet) -> Self
-    where
-        I: IntoIterator<Item = P>,
-        P: AsRef<Path>,
-    {
-        let this = Self {
-            _excludes: excludes,
-            pending_dirs: VecDeque::from_iter(
-                rootdirs.into_iter().map(|p| p.as_ref().to_path_buf()),
-            ),
-            state: GitDirsState::Initial,
-        };
-        trace!("GitDirs::new pending_dirs={:?}", this.pending_dirs);
-        this
+            if is_dir(gitdir_candidate).await {
+                yield dir;
+            } else {
+                let subdirs = read_subdirs(dir).await;
+
+                pending_dirs.extend(subdirs);
+            }
+
+        }
     }
 }
 
@@ -76,60 +66,4 @@ where
 {
     let path = path.as_ref();
     symlink_metadata(path).await.is_ok_and(|m| m.is_dir())
-}
-
-impl Stream for GitDirs {
-    type Item = PathBuf;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut state = GitDirsState::Initial;
-        mem::swap(&mut self.state, &mut state);
-        match state {
-            GitDirsState::Initial => match self.pending_dirs.pop_front() {
-                None => {
-                    trace!("GitDirs::Stream done");
-                    Poll::Ready(None)
-                }
-                Some(dir) => {
-                    let gitdir_candidate = dir.join(".git");
-                    let s = GitDirsState::IsGitDir(dir, Box::pin(is_dir(gitdir_candidate)));
-                    self.state = s;
-                    cx.waker().wake_by_ref();
-                    Poll::Pending
-                }
-            },
-            GitDirsState::IsGitDir(path, mut is_git_dir) => match is_git_dir.as_mut().poll(cx) {
-                Poll::Ready(is_dir) => {
-                    if is_dir {
-                        trace!("GitDirs::Stream yield {:?}", &path);
-                        Poll::Ready(Some(path))
-                    } else {
-                        trace!("GitDirs::Stream read_subdirs {:?}", path);
-                        let q = Box::pin(read_subdirs(path));
-                        let mut state = GitDirsState::ReadSubdirs(q);
-                        mem::swap(&mut self.state, &mut state);
-                        cx.waker().wake_by_ref();
-                        Poll::Pending
-                    }
-                }
-                Poll::Pending => {
-                    let mut state = GitDirsState::IsGitDir(path, is_git_dir);
-                    mem::swap(&mut self.state, &mut state);
-                    Poll::Pending
-                }
-            },
-            GitDirsState::ReadSubdirs(mut read_subdirs) => match read_subdirs.as_mut().poll(cx) {
-                Poll::Ready(subdirs) => {
-                    self.pending_dirs.extend(subdirs);
-                    cx.waker().wake_by_ref();
-                    Poll::Pending
-                }
-                Poll::Pending => {
-                    let mut state = GitDirsState::ReadSubdirs(read_subdirs);
-                    mem::swap(&mut self.state, &mut state);
-                    Poll::Pending
-                }
-            },
-        }
-    }
 }
