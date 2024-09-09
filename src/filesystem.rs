@@ -24,7 +24,7 @@ pub struct GitDirs {
 enum GitDirsState {
     Initial,
     IsGitDir(PathBuf, Pin<Box<dyn Future<Output = bool>>>),
-    QueueSubdirs(Pin<Box<dyn Future<Output = Vec<PathBuf>>>>),
+    ReadSubdirs(Pin<Box<dyn Future<Output = Vec<PathBuf>>>>),
 }
 
 impl GitDirs {
@@ -104,9 +104,9 @@ impl Stream for GitDirs {
                         trace!("GitDirs::Stream yield {:?}", &path);
                         Poll::Ready(Some(path))
                     } else {
-                        trace!("GitDirs::Stream queue {:?}", path);
+                        trace!("GitDirs::Stream read_subdirs {:?}", path);
                         let q = Box::pin(read_subdirs(path));
-                        let mut state = GitDirsState::QueueSubdirs(q);
+                        let mut state = GitDirsState::ReadSubdirs(q);
                         mem::swap(&mut self.state, &mut state);
                         cx.waker().wake_by_ref();
                         Poll::Pending
@@ -118,20 +118,18 @@ impl Stream for GitDirs {
                     Poll::Pending
                 }
             },
-            GitDirsState::QueueSubdirs(mut queue_subdirs) => {
-                match queue_subdirs.as_mut().poll(cx) {
-                    Poll::Ready(subdirs) => {
-                        self.pending_dirs.extend(subdirs);
-                        cx.waker().wake_by_ref();
-                        Poll::Pending
-                    }
-                    Poll::Pending => {
-                        let mut state = GitDirsState::QueueSubdirs(queue_subdirs);
-                        mem::swap(&mut self.state, &mut state);
-                        Poll::Pending
-                    }
+            GitDirsState::ReadSubdirs(mut read_subdirs) => match read_subdirs.as_mut().poll(cx) {
+                Poll::Ready(subdirs) => {
+                    self.pending_dirs.extend(subdirs);
+                    cx.waker().wake_by_ref();
+                    Poll::Pending
                 }
-            }
+                Poll::Pending => {
+                    let mut state = GitDirsState::ReadSubdirs(read_subdirs);
+                    mem::swap(&mut self.state, &mut state);
+                    Poll::Pending
+                }
+            },
         }
     }
 }
