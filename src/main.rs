@@ -15,17 +15,24 @@ async fn tokio_main() -> Result<()> {
     let github = github::git_dirs("tesujimath");
     pin_mut!(github);
 
-    // while let Some(dir) = local.next().await {
-    //     println!("{}", dir.to_string_lossy());
-    // }
+    while let Some(dir) = local.next().await {
+        match dir {
+            Ok(dir) => {
+                println!("{}", dir.to_string_lossy());
+            }
+            Err(e) => {
+                eprintln!("{:?}", e);
+            }
+        }
+    }
 
     // while let Some(dir) = remote.next().await {
     //     println!("{}", dir);
     // }
 
-    while let Some(dir) = github.next().await {
-        println!("{}", dir);
-    }
+    // while let Some(dir) = github.next().await {
+    //     println!("{}", dir);
+    // }
 
     Ok(())
 }

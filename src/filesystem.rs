@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use globset::GlobSet;
@@ -10,7 +11,7 @@ use tokio::fs::{read_dir, symlink_metadata};
 use tokio_stream::wrappers::ReadDirStream;
 use tracing::trace;
 
-pub fn git_dirs<I, P>(rootdirs: I, _excludes: GlobSet) -> impl Stream<Item = PathBuf>
+pub fn git_dirs<I, P>(rootdirs: I, _excludes: GlobSet) -> impl Stream<Item = Result<PathBuf>>
 where
     I: IntoIterator<Item = P>,
     P: AsRef<Path>,
@@ -24,11 +25,16 @@ where
             let gitdir_candidate = dir.join(".git");
 
             if is_dir(gitdir_candidate).await {
-                yield dir;
+                yield Ok(dir);
             } else {
-                let subdirs = read_subdirs(dir).await;
-
-                pending_dirs.extend(subdirs);
+                match read_subdirs(&dir).await {
+                    Ok(subdirs) => {
+                        pending_dirs.extend(subdirs);
+                    }
+                    Err(e) => {
+                        yield Err(e);
+                    }
+                }
             }
 
         }
@@ -36,14 +42,17 @@ where
 }
 
 #[tracing::instrument(level = "trace")]
-async fn read_subdirs<P>(dir: P) -> Vec<PathBuf>
+async fn read_subdirs<P>(dir: P) -> Result<Vec<PathBuf>>
 where
     P: AsRef<Path> + Debug,
 {
     let dir = dir.as_ref();
-    if let Ok(rd) = read_dir(dir).await {
-        let rds = ReadDirStream::new(rd);
-        rds.filter_map(|entry| async move {
+    let rd = read_dir(dir)
+        .await
+        .with_context(|| format!("Failed to read {}", dir.to_string_lossy()))?;
+    let rds = ReadDirStream::new(rd);
+    Ok(rds
+        .filter_map(|entry| async move {
             match entry {
                 Ok(entry) => {
                     let entry_path = dir.join(entry.path());
@@ -53,10 +62,7 @@ where
             }
         })
         .collect::<Vec<PathBuf>>()
-        .await
-    } else {
-        Vec::default()
-    }
+        .await)
 }
 
 #[tracing::instrument(level = "trace")]
