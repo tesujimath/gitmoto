@@ -12,13 +12,21 @@ async fn tokio_main() -> Result<()> {
     let remote = ssh::git_dirs("git", "localhost", ["."], GlobSet::empty());
     pin_mut!(remote);
 
+    let github = github::git_dirs("tesujimath");
+    pin_mut!(github);
+
     // while let Some(dir) = local.next().await {
     //     println!("{}", dir.to_string_lossy());
     // }
 
-    while let Some(dir) = remote.next().await {
+    // while let Some(dir) = remote.next().await {
+    //     println!("{}", dir);
+    // }
+
+    while let Some(dir) = github.next().await {
         println!("{}", dir);
     }
+
     Ok(())
 }
 
@@ -38,4 +46,5 @@ async fn main() -> Result<()> {
 }
 
 pub mod filesystem; // Filesystem traversal
+pub mod github; // GitHub API
 pub mod ssh; // ssh remote traversal

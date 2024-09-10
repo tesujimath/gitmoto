@@ -41,6 +41,9 @@
               # runtime dependencies
               pkg-config
               openssl # for git2 crate
+
+              # devtools
+              gh # GitHub CLI
             ];
 
             shellHook = ''
