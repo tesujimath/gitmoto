@@ -12,27 +12,28 @@ async fn tokio_main() -> Result<()> {
     let remote = ssh::git_dirs("git", "localhost", ["."], GlobSet::empty());
     pin_mut!(remote);
 
-    let github = github::git_dirs("tesujimath");
-    pin_mut!(github);
+    let github = github::Connection::new();
+    let github_repos = github.git_dirs("tesujimath");
+    pin_mut!(github_repos);
 
-    while let Some(dir) = local.next().await {
-        match dir {
-            Ok(dir) => {
-                println!("{}", dir.to_string_lossy());
-            }
-            Err(e) => {
-                eprintln!("{:?}", e);
-            }
-        }
-    }
+    // while let Some(dir) = local.next().await {
+    //     match dir {
+    //         Ok(dir) => {
+    //             println!("{}", dir.to_string_lossy());
+    //         }
+    //         Err(e) => {
+    //             eprintln!("{:?}", e);
+    //         }
+    //     }
+    // }
 
     // while let Some(dir) = remote.next().await {
     //     println!("{}", dir);
     // }
 
-    // while let Some(dir) = github.next().await {
-    //     println!("{}", dir);
-    // }
+    while let Some(dir) = github_repos.next().await {
+        println!("{}", dir);
+    }
 
     Ok(())
 }

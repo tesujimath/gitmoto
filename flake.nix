@@ -32,6 +32,7 @@
               cargo-flamegraph
               cargo-nightly
               cargo-udeps
+              cargo-expand
               gcc
               gdb
               rust-analyzer
