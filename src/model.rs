@@ -10,10 +10,7 @@ impl Default for Model {
     fn default() -> Self {
         Self {
             running: true,
-            repos: vec![
-                LocalRepo::new(PathBuf::from("dummy/path/1")),
-                LocalRepo::new(PathBuf::from("dummy/path/2")),
-            ],
+            repos: Vec::default(),
         }
     }
 }

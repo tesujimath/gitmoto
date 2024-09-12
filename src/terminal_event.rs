@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, MouseEvent};
 use futures::{FutureExt, StreamExt};
 use std::time::Duration;
-use tokio::sync::mpsc;
+use tokio::{select, sync::mpsc};
 
 /// Terminal events.
 #[derive(Clone, Copy, Debug)]
@@ -41,7 +41,7 @@ impl EventHandler {
             loop {
                 let tick_delay = tick.tick();
                 let crossterm_event = reader.next().fuse();
-                tokio::select! {
+                select! {
                   _ = _sender.closed() => {
                     break;
                   }
