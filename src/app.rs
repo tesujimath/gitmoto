@@ -1,9 +1,12 @@
 use std::{default::Default, path::PathBuf};
 
+use crossterm::event::{Event, KeyEvent};
+use tui_input::{backend::crossterm::EventHandler, Input};
+
 #[derive(Debug)]
 pub struct App {
     pub running: bool,
-    pub repo_filter: String,
+    pub repo_filter_input: Input,
     pub repos: Vec<LocalRepo>,
 }
 
@@ -11,7 +14,7 @@ impl Default for App {
     fn default() -> Self {
         Self {
             running: true,
-            repo_filter: "rust".to_string(), //String::default(),
+            repo_filter_input: Input::default(),
             repos: Vec::default(),
         }
     }
@@ -23,6 +26,10 @@ impl App {
     /// Set running to false to quit the application.
     pub fn quit(&mut self) {
         self.running = false;
+    }
+
+    pub fn key(&mut self, ev: KeyEvent) {
+        self.repo_filter_input.handle_event(&Event::Key(ev));
     }
 
     pub fn add_local_repo(&mut self, path: PathBuf) {
