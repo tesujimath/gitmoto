@@ -4,11 +4,11 @@ use ratatui::{
     Frame,
 };
 
-use crate::model::Model;
+use crate::app::App;
 
-pub fn render(model: &mut Model, frame: &mut Frame) {
+pub fn render(app: &mut App, frame: &mut Frame) {
     const DEFAULT_PATH_LEN: u16 = 20u16;
-    let max_len = model
+    let max_len = app
         .repos
         .iter()
         .map(|repo| repo.path.as_os_str().len() as u16)
@@ -21,13 +21,13 @@ pub fn render(model: &mut Model, frame: &mut Frame) {
     let layout =
         Layout::vertical(vec![Constraint::Length(1), Constraint::Fill(1)]).split(frame.area());
 
-    frame.render_widget(Paragraph::new(model.repo_filter.clone()), layout[0]);
+    frame.render_widget(Paragraph::new(app.repo_filter.clone()), layout[0]);
 
-    let rows = model
+    let rows = app
         .repos
         .iter()
         .map(|repo| (repo.path.to_string_lossy(), repo))
-        .filter(|(s, _)| s.contains(&model.repo_filter))
+        .filter(|(s, _)| s.contains(&app.repo_filter))
         .map(|(s, _)| Row::new([s]))
         .collect::<Vec<_>>();
     let n_rows = rows.len();
@@ -38,7 +38,7 @@ pub fn render(model: &mut Model, frame: &mut Frame) {
                 .title(format!(
                     "showing {}/{} local repos",
                     n_rows,
-                    model.repos.len()
+                    app.repos.len()
                 ))
                 .title_alignment(Alignment::Center)
                 .border_type(BorderType::Rounded),

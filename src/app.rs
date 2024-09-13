@@ -1,13 +1,13 @@
 use std::{default::Default, path::PathBuf};
 
 #[derive(Debug)]
-pub struct Model {
+pub struct App {
     pub running: bool,
     pub repo_filter: String,
     pub repos: Vec<LocalRepo>,
 }
 
-impl Default for Model {
+impl Default for App {
     fn default() -> Self {
         Self {
             running: true,
@@ -17,7 +17,7 @@ impl Default for Model {
     }
 }
 
-impl Model {
+impl App {
     pub fn tick(&self) {}
 
     /// Set running to false to quit the application.

@@ -1,10 +1,10 @@
 use std::{fs::OpenOptions, io, path::PathBuf};
 
 use anyhow::Result;
+use app::App;
 use futures::pin_mut;
 use globset::GlobSet;
 use handler::{handle_filesystem_event, handle_key_events};
-use model::Model;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use terminal_event::{EventHandler, TerminalEvent};
 use tokio::{select, sync::mpsc};
@@ -60,7 +60,7 @@ async fn main() -> Result<()> {
     tracing::subscriber::set_global_default(subscriber)?;
 
     // Create an application.
-    let mut model = Model::default();
+    let mut app = App::default();
 
     // Initialize the terminal user interface.
     let backend = CrosstermBackend::new(io::stdout());
@@ -87,22 +87,22 @@ async fn main() -> Result<()> {
         .unwrap();
 
     // Start the main loop.
-    while model.running {
+    while app.running {
         // Render the user interface.
-        tui.draw(&mut model)?;
+        tui.draw(&mut app)?;
         // Handle events.
         select! {
             tui_event = tui.events.next() => {
                 match tui_event? {
-                    TerminalEvent::Tick => model.tick(),
-                    TerminalEvent::Key(key_event) => handle_key_events(key_event, &mut model)?,
+                    TerminalEvent::Tick => app.tick(),
+                    TerminalEvent::Key(key_event) => handle_key_events(key_event, &mut app)?,
                     TerminalEvent::Mouse(_) => {}
                     TerminalEvent::Resize(_, _) => {}
                 }
             }
             filesystem_event = filesystem_event_rx.recv() => {
                 if let Some(filesystem_event) = filesystem_event {
-                handle_filesystem_event(filesystem_event, &mut model);
+                handle_filesystem_event(filesystem_event, &mut app);
                 }
             }
         }
@@ -120,10 +120,10 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+pub mod app;
 pub mod filesystem; // Filesystem traversal
 pub mod github; // GitHub API
 pub mod handler;
-pub mod model;
 pub mod ssh; // ssh remote traversal
 pub mod terminal_event;
 pub mod tui;
