@@ -3,6 +3,7 @@ use std::{default::Default, path::PathBuf};
 #[derive(Debug)]
 pub struct Model {
     pub running: bool,
+    pub repo_filter: String,
     pub repos: Vec<LocalRepo>,
 }
 
@@ -10,6 +11,7 @@ impl Default for Model {
     fn default() -> Self {
         Self {
             running: true,
+            repo_filter: "rust".to_string(), //String::default(),
             repos: Vec::default(),
         }
     }
