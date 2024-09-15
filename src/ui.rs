@@ -24,11 +24,8 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     frame.render_widget(Paragraph::new(app.repo_filter_input.to_string()), layout[0]);
 
     let rows = app
-        .repos
-        .iter()
-        .map(|(path, repo)| (path.to_string_lossy(), repo))
-        .filter(|(s, _)| s.contains(app.repo_filter_input.value()))
-        .map(|(s, _)| Row::new([s]))
+        .filtered_repos()
+        .map(|repo| Row::new([repo.path.to_string_lossy()]))
         .collect::<Vec<_>>();
     let n_rows = rows.len();
 
