@@ -10,8 +10,8 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     const DEFAULT_PATH_LEN: u16 = 20u16;
     let max_len = app
         .repos
-        .iter()
-        .map(|repo| repo.path.as_os_str().len() as u16)
+        .keys()
+        .map(|path| path.as_os_str().len() as u16)
         .max()
         .unwrap_or(DEFAULT_PATH_LEN);
     // let layout =
@@ -26,7 +26,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     let rows = app
         .repos
         .iter()
-        .map(|repo| (repo.path.to_string_lossy(), repo))
+        .map(|(path, repo)| (path.to_string_lossy(), repo))
         .filter(|(s, _)| s.contains(app.repo_filter_input.value()))
         .map(|(s, _)| Row::new([s]))
         .collect::<Vec<_>>();

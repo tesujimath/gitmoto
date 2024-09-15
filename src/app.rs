@@ -1,4 +1,4 @@
-use std::{default::Default, path::PathBuf};
+use std::{collections::BTreeMap, default::Default, path::PathBuf};
 
 use crossterm::event::{Event, KeyEvent};
 use tui_input::{backend::crossterm::EventHandler, Input};
@@ -7,7 +7,7 @@ use tui_input::{backend::crossterm::EventHandler, Input};
 pub struct App {
     pub running: bool,
     pub repo_filter_input: Input,
-    pub repos: Vec<LocalRepo>,
+    pub repos: BTreeMap<PathBuf, LocalRepo>,
 }
 
 impl Default for App {
@@ -15,7 +15,7 @@ impl Default for App {
         Self {
             running: true,
             repo_filter_input: Input::default(),
-            repos: Vec::default(),
+            repos: BTreeMap::default(),
         }
     }
 }
@@ -33,7 +33,7 @@ impl App {
     }
 
     pub fn add_local_repo(&mut self, path: PathBuf) {
-        self.repos.push(LocalRepo::new(path))
+        self.repos.insert(path.clone(), LocalRepo::new(path));
     }
 }
 
