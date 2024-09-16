@@ -45,7 +45,7 @@ async fn main() -> Result<()> {
         warning_tx,
     ));
 
-    let events = EventHandler::new(250);
+    let events = EventHandler::default();
     let mut tui = Tui::new(terminal, events);
     tui.init()?;
 
@@ -63,7 +63,6 @@ async fn main() -> Result<()> {
         select! {
             tui_event = tui.events.next() => {
                 match tui_event? {
-                    TerminalEvent::Tick => app.tick(),
                     TerminalEvent::Key(key_event) => handle_key_events(key_event, &mut app)?,
                     TerminalEvent::Mouse(_) => {}
                     TerminalEvent::Resize(_, _) => {}

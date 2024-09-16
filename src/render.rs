@@ -12,19 +12,22 @@ use ratatui::{
 use crate::app::App;
 
 pub fn render(app: &mut App, frame: &mut Frame) {
-    const DEFAULT_NAME_LEN: u16 = 4u16;
+    // const DEFAULT_PATH_LEN: u16 = 20u16;
     // let repo_max_len = app
     //     .repos
     //     .keys()
     //     .map(|path| path.as_os_str().len() as u16)
     //     .max()
     //     .unwrap_or(DEFAULT_PATH_LEN);
-    let remote_name_max_len = app
-        .repos
-        .values()
-        .flat_map(|repo| repo.remotes.iter().map(|remote| remote.name().len() as u16))
-        .max()
-        .unwrap_or(DEFAULT_NAME_LEN);
+
+    // const DEFAULT_NAME_LEN: u16 = 4u16;
+    // let remote_name_max_len = app
+    //     .repos
+    //     .values()
+    //     .flat_map(|repo| repo.remotes.iter().map(|remote| remote.name().len() as u16))
+    //     .max()
+    //     .unwrap_or(DEFAULT_NAME_LEN);
+
     // let layout =
     //     Layout::horizontal([Constraint::Length(max_len), Constraint::Fill(1)]).split(frame.area());
     // let widths = [Constraint::Length(repo_max_len), Constraint::Length(3)];

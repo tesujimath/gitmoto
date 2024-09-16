@@ -12,7 +12,7 @@ use tokio::{
     task::spawn_blocking,
 };
 use tokio_stream::wrappers::ReadDirStream;
-use tracing::{trace, warn};
+use tracing::warn;
 
 use crate::app::{LocalRepo, Remote};
 

@@ -1,14 +1,11 @@
 use anyhow::anyhow;
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, MouseEvent};
 use futures::{FutureExt, StreamExt};
-use std::time::Duration;
 use tokio::{select, sync::mpsc};
 
 /// Terminal events.
 #[derive(Clone, Copy, Debug)]
 pub enum TerminalEvent {
-    /// Terminal tick.
-    Tick,
     /// Key press.
     Key(KeyEvent),
     /// Mouse click/scroll.
@@ -29,24 +26,17 @@ pub struct EventHandler {
     handler: tokio::task::JoinHandle<()>,
 }
 
-impl EventHandler {
-    /// Constructs a new instance of [`EventHandler`].
-    pub fn new(tick_rate: u64) -> Self {
-        let tick_rate = Duration::from_millis(tick_rate);
+impl Default for EventHandler {
+    fn default() -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
         let _sender = sender.clone();
         let handler = tokio::spawn(async move {
             let mut reader = crossterm::event::EventStream::new();
-            let mut tick = tokio::time::interval(tick_rate);
             loop {
-                let tick_delay = tick.tick();
                 let crossterm_event = reader.next().fuse();
                 select! {
                   _ = _sender.closed() => {
                     break;
-                  }
-                  _ = tick_delay => {
-                    _sender.send(TerminalEvent::Tick).unwrap();
                   }
                   Some(Ok(evt)) = crossterm_event => {
                     match evt {
@@ -78,7 +68,9 @@ impl EventHandler {
             handler,
         }
     }
+}
 
+impl EventHandler {
     /// Receive the next event from the handler thread.
     ///
     /// This function will always block the current thread if
