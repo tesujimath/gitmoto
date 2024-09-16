@@ -1,5 +1,5 @@
-use crate::app::App;
 use crate::filesystem;
+use crate::{app::App, model::Model};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// Handles the key events and updates the state of [`App`].
@@ -19,12 +19,12 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> anyhow::Result<(
 }
 
 /// Handles the key events and updates the state of [`App`].
-pub fn handle_filesystem_event(filesystem_event: filesystem::Event, app: &mut App) {
+pub fn handle_filesystem_event(filesystem_event: filesystem::Event, model: &mut Model) {
     use filesystem::Event::*;
 
     match filesystem_event {
         LocalRepo(path) => {
-            app.add_local_repo(path);
+            model.add_local_repo(path);
         }
     }
 }

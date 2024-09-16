@@ -9,9 +9,10 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::App;
+use crate::presenter::Presenter;
 
-pub fn render(app: &mut App, frame: &mut Frame) {
+// TODO lose the model here if we can
+pub fn render(presenter: &Presenter, frame: &mut Frame) {
     // const DEFAULT_PATH_LEN: u16 = 20u16;
     // let repo_max_len = app
     //     .repos
@@ -41,9 +42,12 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     let layout =
         Layout::vertical(vec![Constraint::Length(1), Constraint::Fill(1)]).split(frame.area());
 
-    frame.render_widget(Paragraph::new(app.repo_filter_input.to_string()), layout[0]);
+    frame.render_widget(
+        Paragraph::new(presenter.repo_filter_input.to_string()),
+        layout[0],
+    );
 
-    let filtered_repos = app.filtered_repos().collect::<Vec<_>>();
+    let filtered_repos = presenter.filtered_repos().collect::<Vec<_>>();
     let n_filtered_repos = filtered_repos.len();
 
     let rows = filtered_repos
@@ -69,7 +73,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
                 .title(format!(
                     " showing {}/{} local repos ",
                     n_filtered_repos,
-                    app.repos.len()
+                    presenter.model.repos.len()
                 ))
                 .title_alignment(Alignment::Center)
                 .border_type(BorderType::Rounded),

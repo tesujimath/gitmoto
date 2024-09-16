@@ -14,7 +14,7 @@ use tokio::{
 use tokio_stream::wrappers::ReadDirStream;
 use tracing::warn;
 
-use crate::app::{LocalRepo, Remote};
+use crate::model::{LocalRepo, Remote};
 
 pub enum Request {
     Scan(PathBuf),

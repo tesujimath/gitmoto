@@ -70,7 +70,7 @@ async fn main() -> Result<()> {
             }
             filesystem_event = filesystem_event_rx.recv() => {
                 if let Some(filesystem_event) = filesystem_event {
-                handle_filesystem_event(filesystem_event, &mut app);
+                handle_filesystem_event(filesystem_event, &mut app.presenter.model);
                 }
             }
         }
@@ -92,6 +92,8 @@ pub mod app;
 pub mod filesystem; // Filesystem traversal
 pub mod github; // GitHub API
 pub mod handler;
+pub mod model;
+pub mod presenter;
 pub mod render;
 pub mod ssh; // ssh remote traversal
 pub mod terminal_event;
