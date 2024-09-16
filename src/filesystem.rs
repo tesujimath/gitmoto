@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use futures::StreamExt;
 use std::{
+    borrow::Borrow,
     collections::VecDeque,
     fmt::Debug,
     path::{Path, PathBuf},
@@ -117,19 +118,17 @@ where
 #[tracing::instrument(level = "trace")]
 async fn git_remotes(path: PathBuf) -> Vec<Remote> {
     match spawn_blocking(move || match gix::discover(&path) {
-        Ok(repo) => {
-            use gix::remote::Direction::Push;
-            let default_push_remote = repo.find_default_remote(Push);
-            if let Some(Ok(default_push_remote)) = default_push_remote {
-                if let Some(url) = default_push_remote.url(Push) {
-                    vec![Remote::new(url)]
-                } else {
-                    Vec::default()
-                }
-            } else {
-                Vec::default()
-            }
-        }
+        Ok(repo) => repo
+            .remote_names()
+            .into_iter()
+            .filter_map(|name| {
+                let name: &gix::bstr::BStr = name.borrow();
+                let remote = repo.find_remote(name).unwrap();
+                remote
+                    .url(gix::remote::Direction::Push)
+                    .map(|url| Remote::new(name, url))
+            })
+            .collect::<Vec<_>>(),
         Err(e) => {
             warn!("git_remotes failed on {:?}: {}", &path, e);
             Vec::default()

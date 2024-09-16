@@ -68,17 +68,24 @@ impl LocalRepo {
 
 #[derive(Debug)]
 pub struct Remote {
+    name: String,
     url: String,
 }
 
 impl Remote {
-    pub fn new<S>(url: S) -> Self
+    pub fn new<S1, S2>(name: S1, url: S2) -> Self
     where
-        S: Display,
+        S1: Display,
+        S2: Display,
     {
         Self {
+            name: name.to_string(),
             url: url.to_string(),
         }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     pub fn url(&self) -> &str {
