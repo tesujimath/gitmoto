@@ -80,4 +80,8 @@ impl Remote {
             url: url.to_string(),
         }
     }
+
+    pub fn url(&self) -> &str {
+        &self.url
+    }
 }
