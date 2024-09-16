@@ -13,6 +13,7 @@ async-trait = "0.1.81"
 crossterm = { version = "0.28.1", features = ["event-stream"] }
 futures = "0.3.28"
 futures-util = "0.3.30"
+gix = "0.66.0"
 globset = "0.4.14"
 leaky-bucket = "1.1.2"
 octocrab = { version = "0.39.0", features = ["stream"] }

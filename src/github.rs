@@ -1,13 +1,11 @@
 use anyhow::Context;
 use async_stream::stream;
 use futures::Stream;
-use futures_util::TryStreamExt;
 use leaky_bucket::RateLimiter;
 use octocrab::models::Repository;
 use std::{collections::HashMap, default::Default, io::Read, time::Duration};
 use subprocess::Exec;
-use tokio::pin;
-use tracing::{debug, info, trace};
+use tracing::{debug, info};
 
 pub struct Connection {
     auth_token: Option<String>,

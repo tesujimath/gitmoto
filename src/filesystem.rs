@@ -1,7 +1,5 @@
 use anyhow::{Context, Result};
-use async_stream::stream;
-use futures::{Stream, StreamExt};
-use globset::GlobSet;
+use futures::StreamExt;
 use std::{
     collections::VecDeque,
     fmt::Debug,
@@ -12,7 +10,7 @@ use tokio::{
     sync::mpsc,
 };
 use tokio_stream::wrappers::ReadDirStream;
-use tracing::trace;
+use tracing::warn;
 
 pub enum Request {
     Scan(PathBuf),
@@ -32,16 +30,13 @@ pub async fn worker(
 
         match request {
             Scan(rootdir) => {
-                trace!("filesystem::Scan({:?})", &rootdir);
                 let mut pending_dirs = VecDeque::from([rootdir]);
 
                 while let Some(dir) = pending_dirs.pop_front() {
-                    let gitdir_candidate = dir.join(".git");
+                    let git_candidate = dir.join(".git");
 
-                    if is_dir(gitdir_candidate).await {
-                        trace!("filesystem::Scan sending {:?}", &dir);
+                    if is_primary_git_worktree(&git_candidate).await {
                         event_tx.send(Event::GitDir(dir)).await.unwrap();
-                        trace!("filesystem::Scan sent")
                     } else {
                         match read_subdirs(&dir).await {
                             Ok(subdirs) => {
@@ -49,44 +44,14 @@ pub async fn worker(
                             }
                             Err(e) => {
                                 let warning = e.to_string();
-                                trace!("filesystem::Scan warning {}", &warning);
+                                warn!("filesystem::Scan warning {}", &warning);
                                 warning_tx.send(warning).await.unwrap();
-                                trace!("filesystem::Scan warned")
+                                warn!("filesystem::Scan warned")
                             }
                         }
                     }
                 }
             }
-        }
-    }
-}
-
-pub fn git_dirs<I, P>(rootdirs: I, _excludes: GlobSet) -> impl Stream<Item = Result<PathBuf>>
-where
-    I: IntoIterator<Item = P>,
-    P: AsRef<Path>,
-{
-    let mut pending_dirs =
-        VecDeque::from_iter(rootdirs.into_iter().map(|p| p.as_ref().to_path_buf()));
-    trace!("git_dirs(pending_dirs={:?})", pending_dirs);
-
-    stream! {
-        while let Some(dir)  = pending_dirs.pop_front() {
-            let gitdir_candidate = dir.join(".git");
-
-            if is_dir(gitdir_candidate).await {
-                yield Ok(dir);
-            } else {
-                match read_subdirs(&dir).await {
-                    Ok(subdirs) => {
-                        pending_dirs.extend(subdirs);
-                    }
-                    Err(e) => {
-                        yield Err(e);
-                    }
-                }
-            }
-
         }
     }
 }
@@ -122,4 +87,24 @@ where
 {
     let path = path.as_ref();
     symlink_metadata(path).await.is_ok_and(|m| m.is_dir())
+}
+
+#[tracing::instrument(level = "trace")]
+async fn is_primary_git_worktree<P>(path: P) -> bool
+where
+    P: Into<PathBuf> + Debug,
+{
+    let path = path.into();
+    match tokio::task::spawn_blocking(move || gix::discover::is_git(&path)).await {
+        Ok(Ok(kind)) => {
+            matches!(
+                kind,
+                gix::discover::repository::Kind::WorkTree {
+                    linked_git_dir: None,
+                }
+            )
+        }
+        Ok(Err(_)) => false,
+        Err(_) => false,
+    }
 }

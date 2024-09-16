@@ -2,48 +2,13 @@ use std::{fs::OpenOptions, io, path::PathBuf};
 
 use anyhow::Result;
 use app::App;
-use futures::pin_mut;
-use globset::GlobSet;
 use handler::{handle_filesystem_event, handle_key_events};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use terminal_event::{EventHandler, TerminalEvent};
 use tokio::{select, sync::mpsc};
-use tokio_stream::StreamExt;
+use tracing::trace;
 use tracing_subscriber::EnvFilter;
 use tui::Tui;
-
-async fn tokio_main() -> Result<()> {
-    // let local = filesystem::git_dirs(["/home/sjg/vc", "/home/sjg/junk"], GlobSet::empty());
-    // pin_mut!(local);
-
-    // let remote = ssh::git_dirs("git", "localhost", ["."], GlobSet::empty());
-    // pin_mut!(remote);
-
-    // let github = github::Connection::new();
-    // let github_repos = github.git_dirs("tesujimath");
-    // pin_mut!(github_repos);
-
-    // while let Some(dir) = local.next().await {
-    //     match dir {
-    //         Ok(dir) => {
-    //             println!("{}", dir.to_string_lossy());
-    //         }
-    //         Err(e) => {
-    //             eprintln!("{:?}", e);
-    //         }
-    //     }
-    // }
-
-    // while let Some(dir) = remote.next().await {
-    //     println!("{}", dir);
-    // }
-
-    // while let Some(dir) = github_repos.next().await {
-    //     println!("{}", dir);
-    // }
-
-    Ok(())
-}
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
@@ -58,6 +23,10 @@ async fn main() -> Result<()> {
         .with_writer(logfile)
         .finish();
     tracing::subscriber::set_global_default(subscriber)?;
+
+    trace!("");
+    trace!("                    STARTING");
+    trace!("");
 
     // Create an application.
     let mut app = App::default();
