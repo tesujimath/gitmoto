@@ -93,7 +93,7 @@ pub mod app;
 pub mod filesystem; // Filesystem traversal
 pub mod github; // GitHub API
 pub mod handler;
+pub mod render;
 pub mod ssh; // ssh remote traversal
 pub mod terminal_event;
 pub mod tui;
-pub mod ui;
