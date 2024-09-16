@@ -8,16 +8,19 @@ use std::{
 use tokio::{
     fs::{read_dir, symlink_metadata},
     sync::mpsc,
+    task::spawn_blocking,
 };
 use tokio_stream::wrappers::ReadDirStream;
-use tracing::warn;
+use tracing::{trace, warn};
+
+use crate::app::{LocalRepo, Remote};
 
 pub enum Request {
     Scan(PathBuf),
 }
 
 pub enum Event {
-    GitDir(PathBuf),
+    LocalRepo(LocalRepo),
 }
 
 pub async fn worker(
@@ -33,10 +36,12 @@ pub async fn worker(
                 let mut pending_dirs = VecDeque::from([rootdir]);
 
                 while let Some(dir) = pending_dirs.pop_front() {
-                    let git_candidate = dir.join(".git");
+                    let git_dir = dir.join(".git");
 
-                    if is_primary_git_worktree(&git_candidate).await {
-                        event_tx.send(Event::GitDir(dir)).await.unwrap();
+                    if is_primary_git_worktree(&git_dir).await {
+                        let remotes = git_remotes(git_dir).await;
+                        let repo = LocalRepo::new(dir, remotes);
+                        event_tx.send(Event::LocalRepo(repo)).await.unwrap();
                     } else {
                         match read_subdirs(&dir).await {
                             Ok(subdirs) => {
@@ -95,7 +100,7 @@ where
     P: Into<PathBuf> + Debug,
 {
     let path = path.into();
-    match tokio::task::spawn_blocking(move || gix::discover::is_git(&path)).await {
+    match spawn_blocking(move || gix::discover::is_git(&path)).await {
         Ok(Ok(kind)) => {
             matches!(
                 kind,
@@ -106,5 +111,36 @@ where
         }
         Ok(Err(_)) => false,
         Err(_) => false,
+    }
+}
+
+#[tracing::instrument(level = "trace")]
+async fn git_remotes(path: PathBuf) -> Vec<Remote> {
+    match spawn_blocking(move || match gix::discover(&path) {
+        Ok(repo) => {
+            use gix::remote::Direction::Push;
+            let default_push_remote = repo.find_default_remote(Push);
+            if let Some(Ok(default_push_remote)) = default_push_remote {
+                if let Some(url) = default_push_remote.url(Push) {
+                    vec![Remote::new(url)]
+                } else {
+                    Vec::default()
+                }
+            } else {
+                Vec::default()
+            }
+        }
+        Err(e) => {
+            warn!("git_remotes failed on {:?}: {}", &path, e);
+            Vec::default()
+        }
+    })
+    .await
+    {
+        Ok(remotes) => remotes,
+        Err(e) => {
+            warn!("spawn_blocking git_remotes failed: {}", e);
+            Vec::default()
+        }
     }
 }

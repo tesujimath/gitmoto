@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, default::Default, path::PathBuf};
+use std::{collections::BTreeMap, default::Default, fmt::Display, path::PathBuf};
 
 use crossterm::event::{Event, KeyCode, KeyEvent};
 use tui_input::{backend::crossterm::EventHandler, Input};
@@ -36,8 +36,8 @@ impl App {
         }
     }
 
-    pub fn add_local_repo(&mut self, path: PathBuf) {
-        self.repos.insert(path.clone(), LocalRepo::new(path));
+    pub fn add_local_repo(&mut self, repo: LocalRepo) {
+        self.repos.insert(repo.path.clone(), repo);
     }
 
     pub fn filtered_repos(&self) -> impl Iterator<Item = &LocalRepo> {
@@ -57,19 +57,27 @@ impl App {
 #[derive(Debug)]
 pub struct LocalRepo {
     pub path: PathBuf,
-    pub remotes: Option<Vec<Remote>>, // None means unknown, empty vec means no remotes
+    pub remotes: Vec<Remote>,
 }
 
 impl LocalRepo {
-    fn new(path: PathBuf) -> Self {
-        Self {
-            path,
-            remotes: None,
-        }
+    pub fn new(path: PathBuf, remotes: Vec<Remote>) -> Self {
+        Self { path, remotes }
     }
 }
 
 #[derive(Debug)]
 pub struct Remote {
     url: String,
+}
+
+impl Remote {
+    pub fn new<S>(url: S) -> Self
+    where
+        S: Display,
+    {
+        Self {
+            url: url.to_string(),
+        }
+    }
 }

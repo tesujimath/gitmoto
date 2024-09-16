@@ -23,7 +23,7 @@ pub fn handle_filesystem_event(filesystem_event: filesystem::Event, app: &mut Ap
     use filesystem::Event::*;
 
     match filesystem_event {
-        GitDir(path) => {
+        LocalRepo(path) => {
             app.add_local_repo(path);
         }
     }

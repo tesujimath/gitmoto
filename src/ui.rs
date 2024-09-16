@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use ratatui::{
     layout::{Alignment, Constraint, Layout},
     widgets::{Block, BorderType, Paragraph, Row, Table},
@@ -16,7 +18,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .unwrap_or(DEFAULT_PATH_LEN);
     // let layout =
     //     Layout::horizontal([Constraint::Length(max_len), Constraint::Fill(1)]).split(frame.area());
-    let widths = [Constraint::Length(max_len)];
+    let widths = [Constraint::Length(max_len), Constraint::Length(3)];
 
     let layout =
         Layout::vertical(vec![Constraint::Length(1), Constraint::Fill(1)]).split(frame.area());
@@ -25,7 +27,12 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
     let rows = app
         .filtered_repos()
-        .map(|repo| Row::new([repo.path.to_string_lossy()]))
+        .map(|repo| {
+            Row::new([
+                repo.path.to_string_lossy(),
+                Cow::Owned(repo.remotes.len().to_string()),
+            ])
+        })
         .collect::<Vec<_>>();
     let n_rows = rows.len();
 
