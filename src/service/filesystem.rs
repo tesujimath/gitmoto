@@ -55,6 +55,15 @@ impl Service {
     pub fn recv_event(&mut self) -> impl Future<Output = Option<Event>> + '_ {
         self.event_rx.recv()
     }
+
+    pub async fn handle<F>(&mut self, ev: Event, add_local_repo: F)
+    where
+        F: FnOnce(LocalRepo),
+    {
+        match ev {
+            Event::LocalRepo(repo) => add_local_repo(repo),
+        }
+    }
 }
 
 async fn worker(

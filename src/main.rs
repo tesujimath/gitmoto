@@ -6,9 +6,8 @@ use tracing::trace;
 use tracing_subscriber::EnvFilter;
 
 use crate::{
-    app::App,
-    handler::{handle_filesystem_event, handle_key_events},
-    render::render,
+    model::UpdateModel,
+    presenter::Presenter,
     service::{filesystem, terminal},
     tui::Tui,
 };
@@ -32,7 +31,7 @@ async fn main() -> Result<()> {
     trace!("");
 
     // Create an application.
-    let mut app = App::default();
+    let mut presenter = Presenter::default();
 
     // Initialize the terminal user interface.
     let backend = CrosstermBackend::new(io::stdout());
@@ -50,26 +49,23 @@ async fn main() -> Result<()> {
         .unwrap();
 
     // Start the main loop.
-    // let mut terminal_closed = false;
-    while app.running {
+    let mut running = true;
+    while running {
         // Render the user interface.
-        tui.draw(|frame| render(&app.presenter, frame))?;
+        tui.draw(|frame| presenter.render(frame))?;
         // Handle events.
         select! {
-            terminal_event = terminal_service.recv_event()/*, if !terminal_closed*/ => {
-                match terminal_event {
-                    None => {
-                        /*terminal_closed = true;*/
-                        trace!("None from terminal_service::recv_event");
-                         }
-                    Some(terminal::Event::Key(key_event)) => handle_key_events(key_event, &mut app),
-                    Some(terminal::Event::Mouse(_)) => {}
-                    Some(terminal::Event::Resize(_, _)) => {}
+            ev = terminal_service.recv_event()  => {
+                if let Some(ev) = ev {
+                    let quit = terminal_service.handle(ev, |key| presenter.handle_key(key)).await;
+                    if quit {
+                        running = false;
+                    }
                 }
-            }
-            filesystem_event = filesystem_service.recv_event() => {
-                if let Some(filesystem_event) = filesystem_event {
-                handle_filesystem_event(filesystem_event, &mut app.presenter.model);
+            },
+            key = filesystem_service.recv_event() => {
+                if let Some(key) = key {
+                    filesystem_service.handle(key, |repo| presenter.add_local_repo(repo)).await;
                 }
             }
         }
@@ -81,12 +77,9 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-pub mod app;
 pub mod github; // GitHub API
-pub mod handler;
 pub mod model;
 pub mod presenter;
-pub mod render;
 pub mod service;
 pub mod ssh; // ssh remote traversal
 pub mod tui;

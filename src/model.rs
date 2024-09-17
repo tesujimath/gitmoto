@@ -5,8 +5,12 @@ pub struct Model {
     pub repos: BTreeMap<PathBuf, LocalRepo>,
 }
 
-impl Model {
-    pub fn add_local_repo(&mut self, repo: LocalRepo) {
+pub trait UpdateModel {
+    fn add_local_repo(&mut self, repo: LocalRepo);
+}
+
+impl UpdateModel for Model {
+    fn add_local_repo(&mut self, repo: LocalRepo) {
         self.repos.insert(repo.path.clone(), repo);
     }
 }

@@ -1,7 +1,6 @@
-use std::future::Future;
-
-use crossterm::event::{Event as CrosstermEvent, KeyEvent, MouseEvent};
+use crossterm::event::{KeyEvent, MouseEvent};
 use futures::{FutureExt, StreamExt};
+use std::future::Future;
 use tokio::{select, sync::mpsc};
 
 /// Terminal events.
@@ -42,23 +41,24 @@ impl Default for Service {
                     break;
                   }
                   Some(Ok(evt)) = crossterm_event => {
+                      use crossterm::event::Event::*;
                     match evt {
-                      CrosstermEvent::Key(key) => {
+                      Key(key) => {
                         if key.kind == crossterm::event::KeyEventKind::Press {
                           _sender.send(Event::Key(key)).unwrap();
                         }
                       },
-                      CrosstermEvent::Mouse(mouse) => {
+                      Mouse(mouse) => {
                         _sender.send(Event::Mouse(mouse)).unwrap();
                       },
-                      CrosstermEvent::Resize(x, y) => {
+                      Resize(x, y) => {
                         _sender.send(Event::Resize(x, y)).unwrap();
                       },
-                      CrosstermEvent::FocusLost => {
+                      FocusLost => {
                       },
-                      CrosstermEvent::FocusGained => {
+                      FocusGained => {
                       },
-                      CrosstermEvent::Paste(_) => {
+                      Paste(_) => {
                       },
                     }
                   }
@@ -83,5 +83,20 @@ impl Service {
     /// None is returned when the terminal is closed.
     pub fn recv_event(&mut self) -> impl Future<Output = Option<Event>> + '_ {
         self.receiver.recv()
+    }
+
+    pub async fn handle<F>(&mut self, ev: Event, key_handler: F) -> bool
+    where
+        F: FnOnce(KeyEvent) -> bool,
+    {
+        use Event::*;
+        let mut quit = false;
+        match ev {
+            Key(key_event) => quit = key_handler(key_event),
+            Mouse(_) => {}
+            Resize(_, _) => {}
+        }
+
+        quit
     }
 }
