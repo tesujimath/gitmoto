@@ -4,6 +4,7 @@ use std::{
     borrow::Borrow,
     collections::VecDeque,
     fmt::Debug,
+    future::Future,
     path::{Path, PathBuf},
 };
 use tokio::{
@@ -24,7 +25,39 @@ pub enum Event {
     LocalRepo(LocalRepo),
 }
 
-pub async fn worker(
+pub struct Service {
+    event_rx: mpsc::Receiver<Event>,
+    request_tx: mpsc::Sender<Request>,
+    warning_rx: mpsc::Receiver<String>,
+}
+
+impl Default for Service {
+    fn default() -> Self {
+        let (event_tx, event_rx) = mpsc::channel(1);
+        let (request_tx, request_rx) = mpsc::channel(1);
+        let (warning_tx, warning_rx) = mpsc::channel(1);
+
+        tokio::spawn(worker(request_rx, event_tx, warning_tx));
+
+        Self {
+            event_rx,
+            request_tx,
+            warning_rx,
+        }
+    }
+}
+
+impl Service {
+    pub fn requester(&self) -> mpsc::Sender<Request> {
+        self.request_tx.clone()
+    }
+
+    pub fn recv_event(&mut self) -> impl Future<Output = Option<Event>> + '_ {
+        self.event_rx.recv()
+    }
+}
+
+async fn worker(
     mut request_rx: mpsc::Receiver<Request>,
     event_tx: mpsc::Sender<Event>,
     warning_tx: mpsc::Sender<String>,

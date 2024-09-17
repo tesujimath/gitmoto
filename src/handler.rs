@@ -3,7 +3,7 @@ use crate::{app::App, model::Model};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// Handles the key events and updates the state of [`App`].
-pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> anyhow::Result<()> {
+pub fn handle_key_events(key_event: KeyEvent, app: &mut App) {
     match key_event.code {
         // Exit application on `Ctrl-C`
         KeyCode::Char('c') | KeyCode::Char('C') if key_event.modifiers == KeyModifiers::CONTROL => {
@@ -15,7 +15,6 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> anyhow::Result<(
             app.key(key_event);
         }
     }
-    Ok(())
 }
 
 /// Handles the key events and updates the state of [`App`].
