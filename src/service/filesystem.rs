@@ -13,7 +13,7 @@ use tokio::{
     task::spawn_blocking,
 };
 use tokio_stream::wrappers::ReadDirStream;
-use tracing::warn;
+use tracing::{error, warn};
 
 use crate::model::{LocalRepo, Remote};
 
@@ -28,21 +28,18 @@ pub enum Event {
 pub struct Service {
     event_rx: mpsc::Receiver<Event>,
     request_tx: mpsc::Sender<Request>,
-    warning_rx: mpsc::Receiver<String>,
 }
 
 impl Default for Service {
     fn default() -> Self {
         let (event_tx, event_rx) = mpsc::channel(1);
         let (request_tx, request_rx) = mpsc::channel(1);
-        let (warning_tx, warning_rx) = mpsc::channel(1);
 
-        tokio::spawn(worker(request_rx, event_tx, warning_tx));
+        tokio::spawn(worker(request_rx, event_tx));
 
         Self {
             event_rx,
             request_tx,
-            warning_rx,
         }
     }
 }
@@ -66,11 +63,7 @@ impl Service {
     }
 }
 
-async fn worker(
-    mut request_rx: mpsc::Receiver<Request>,
-    event_tx: mpsc::Sender<Event>,
-    warning_tx: mpsc::Sender<String>,
-) {
+async fn worker(mut request_rx: mpsc::Receiver<Request>, event_tx: mpsc::Sender<Event>) {
     while let Some(request) = request_rx.recv().await {
         use Request::*;
 
@@ -91,10 +84,7 @@ async fn worker(
                                 pending_dirs.extend(subdirs);
                             }
                             Err(e) => {
-                                let warning = e.to_string();
-                                warn!("filesystem::Scan warning {}", &warning);
-                                warning_tx.send(warning).await.unwrap();
-                                warn!("filesystem::Scan warned")
+                                error!("read_subdirs: {}", e)
                             }
                         }
                     }
