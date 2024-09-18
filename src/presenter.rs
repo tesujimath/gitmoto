@@ -1,8 +1,10 @@
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
-    layout::{Alignment, Constraint, Layout},
+    layout::{Alignment, Constraint, Layout, Margin},
     style::Modifier,
-    widgets::{Block, BorderType, Paragraph, Row, Table},
+    widgets::{
+        Block, BorderType, Paragraph, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table,
+    },
     Frame,
 };
 use std::{
@@ -11,7 +13,6 @@ use std::{
     default::Default,
     path::PathBuf,
 };
-use tracing::trace;
 use tui_input::{backend::crossterm::EventHandler, Input};
 
 use crate::model::{LocalRepo, Model, UpdateModel};
@@ -137,32 +138,46 @@ impl Presenter {
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
-        let widths = [
-            Constraint::Ratio(1, 2),
-            Constraint::Length(10),
-            Constraint::Ratio(1, 2),
-        ];
-
-        let layout =
+        let main_layout =
             Layout::vertical(vec![Constraint::Length(1), Constraint::Fill(1)]).split(frame.area());
+        let repo_layout = Layout::horizontal(vec![Constraint::Length(1), Constraint::Fill(1)])
+            .split(main_layout[1]);
+
         const BORDER_WASTAGE: usize = 2;
-        self.view_height = (layout[1].height as usize).saturating_sub(BORDER_WASTAGE);
+        self.view_height = (main_layout[1].height as usize).saturating_sub(BORDER_WASTAGE);
 
         frame.render_widget(
             Paragraph::new(self.repo_filter_input.to_string()),
-            layout[0],
+            main_layout[0],
         );
 
         let (filtered_repos, u_selected) = self.filtered_repos();
         let n_filtered_repos = filtered_repos.len();
 
         // work out what is visible
-        let max_visible = layout[1].height as usize;
+        let max_visible = main_layout[1].height as usize;
         let skip = if let Some(u_selected) = u_selected {
             u_selected - min(self.selected.as_ref().unwrap().u_view, u_selected)
         } else {
             0
         };
+
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(Some("↑"))
+            .end_symbol(Some("↓"));
+
+        let scrollbar_content_length = if n_filtered_repos < self.view_height {
+            n_filtered_repos
+        } else {
+            n_filtered_repos - self.view_height
+        };
+        let mut scrollbar_state = ScrollbarState::new(scrollbar_content_length).position(skip);
+
+        let table_widths = [
+            Constraint::Ratio(1, 2),
+            Constraint::Length(10),
+            Constraint::Ratio(1, 2),
+        ];
 
         let rows = filtered_repos
             .into_iter()
@@ -184,8 +199,18 @@ impl Presenter {
             })
             .collect::<Vec<_>>();
 
+        frame.render_stateful_widget(
+            scrollbar,
+            repo_layout[0].inner(Margin {
+                // using an inner vertical margin of 1 unit makes the scrollbar inside the block
+                vertical: 1,
+                horizontal: 0,
+            }),
+            &mut scrollbar_state,
+        );
+
         frame.render_widget(
-            Table::new(rows, widths).block(
+            Table::new(rows, table_widths).block(
                 Block::bordered()
                     .title(format!(
                         " filtered {}/{} local repos ",
@@ -195,7 +220,7 @@ impl Presenter {
                     .title_alignment(Alignment::Center)
                     .border_type(BorderType::Rounded),
             ),
-            layout[1],
+            repo_layout[1],
         )
     }
 
