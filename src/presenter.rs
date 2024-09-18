@@ -70,9 +70,8 @@ impl Presenter {
                 None => constrained_by(offset, filtered_repos_len),
             };
 
-            let u_view_scrolled = match self.selected.as_ref() {
-                Some(selected) => {
-                    let u_selected = u_selected.unwrap();
+            let u_view_scrolled = match (self.selected.as_ref(), u_selected) {
+                (Some(selected), Some(u_selected)) => {
                     let i_view = selected.u_view as isize;
                     if u_scrolled > u_selected
                         && selected.u_view + u_scrolled - u_selected < self.view_height
@@ -85,7 +84,7 @@ impl Presenter {
                     }
                 }
 
-                None => {
+                _ => {
                     if offset < 0 {
                         0
                     } else {
