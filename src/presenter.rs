@@ -11,6 +11,7 @@ use std::{
     default::Default,
     path::PathBuf,
 };
+use tracing::trace;
 use tui_input::{backend::crossterm::EventHandler, Input};
 
 use crate::model::{LocalRepo, Model, UpdateModel};
@@ -136,26 +137,6 @@ impl Presenter {
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
-        // const DEFAULT_PATH_LEN: u16 = 20u16;
-        // let repo_max_len = app
-        //     .repos
-        //     .keys()
-        //     .map(|path| path.as_os_str().len() as u16)
-        //     .max()
-        //     .unwrap_or(DEFAULT_PATH_LEN);
-
-        // const DEFAULT_NAME_LEN: u16 = 4u16;
-        // let remote_name_max_len = app
-        //     .repos
-        //     .values()
-        //     .flat_map(|repo| repo.remotes.iter().map(|remote| remote.name().len() as u16))
-        //     .max()
-        //     .unwrap_or(DEFAULT_NAME_LEN);
-
-        // let layout =
-        //     Layout::horizontal([Constraint::Length(max_len), Constraint::Fill(1)]).split(frame.area());
-        // let widths = [Constraint::Length(repo_max_len), Constraint::Length(3)];
-
         let widths = [
             Constraint::Ratio(1, 2),
             Constraint::Length(10),
@@ -182,15 +163,6 @@ impl Presenter {
         } else {
             0
         };
-        //         let visible_repos =if filtered_repos.len() > max_visible {
-
-        //
-        // }
-        //             filtered_repos.into_iter().take(max_visible)
-        //  std::iter::empty()
-        //         } else {
-        //             filtered_repos.into_iter().take(max_visible)
-        //         }
 
         let rows = filtered_repos
             .into_iter()
@@ -211,22 +183,6 @@ impl Presenter {
                 .style(modifier)
             })
             .collect::<Vec<_>>();
-        // let _rows_with_remotes = filtered_repos
-        //     .into_iter()
-        //     .flat_map(|repo| {
-        //         let repo_path_then_empty =
-        //             once(repo.path.to_string_lossy()).chain(repeat(Cow::Borrowed("")));
-        //         repo_path_then_empty
-        //             .zip(repo.remotes.iter())
-        //             .map(|(path, remote)| {
-        //                 Row::new([
-        //                     path,
-        //                     Cow::Borrowed(remote.name()),
-        //                     Cow::Borrowed(remote.url()),
-        //                 ])
-        //             })
-        //     })
-        //     .collect::<Vec<_>>();
 
         frame.render_widget(
             Table::new(rows, widths).block(
@@ -243,21 +199,15 @@ impl Presenter {
         )
     }
 
-    fn model_updated(&mut self) {
-        // if self.selected.is_none() {
-        //     self.selected = self
-        //         .model
-        //         .repos
-        //         .first_key_value()
-        //         .map(|(path, _repo)| Selected::new(path.clone(), 0));
-        // }
-    }
+    // fn model_updated(&mut self) {
+    //     trace!("model updated");
+    // }
 }
 
 impl UpdateModel for Presenter {
     fn add_local_repo(&mut self, repo: LocalRepo) {
         self.model.add_local_repo(repo);
-        self.model_updated();
+        // self.model_updated();
     }
 }
 
