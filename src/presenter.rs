@@ -53,6 +53,8 @@ impl Presenter {
             self.scroll(-(self.view_height as isize));
         } else if ev.code == KeyCode::PageDown {
             self.scroll(self.view_height as isize);
+        } else if ev.code == KeyCode::Enter {
+            self.open_git_client();
         } else {
             self.repo_filter_input.handle_event(&Event::Key(ev));
         }
@@ -222,6 +224,18 @@ impl Presenter {
             ),
             repo_layout[1],
         )
+    }
+
+    // TODO - this shouldn't be inline perhaps?
+    fn open_git_client(&mut self) {
+        if let Some(selected) = self.selected.as_ref() {
+            let path = selected.path.canonicalize().unwrap();
+            let magit_status = format!("(magit-status \"{}\")", path.to_string_lossy());
+            std::process::Command::new("emacsclient")
+                .args(["--create-frame", "--eval", &magit_status])
+                .spawn()
+                .expect("Failed to spawn emacsclient");
+        }
     }
 
     // fn model_updated(&mut self) {
