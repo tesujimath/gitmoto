@@ -1,13 +1,15 @@
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Alignment, Constraint, Layout},
+    style::Modifier,
     widgets::{Block, BorderType, Paragraph, Row, Table},
     Frame,
 };
 use std::{
     borrow::Cow,
+    cmp::{max, min},
     default::Default,
-    iter::{once, repeat},
+    path::PathBuf,
 };
 use tui_input::{backend::crossterm::EventHandler, Input};
 
@@ -17,6 +19,8 @@ use crate::model::{LocalRepo, Model, UpdateModel};
 pub struct Presenter {
     model: Model,
     repo_filter_input: Input,
+    view_height: usize,
+    selected: Option<Selected>,
 }
 
 impl Default for Presenter {
@@ -25,6 +29,8 @@ impl Default for Presenter {
         Self {
             model,
             repo_filter_input: Input::default(),
+            view_height: 1,
+            selected: None,
         }
     }
 }
@@ -37,6 +43,14 @@ impl Presenter {
 
         if ev.code == KeyCode::Esc {
             self.repo_filter_input.reset();
+        } else if ev.code == KeyCode::Up {
+            self.scroll(-1);
+        } else if ev.code == KeyCode::Down {
+            self.scroll(1);
+        } else if ev.code == KeyCode::PageUp {
+            self.scroll(-(self.view_height as isize));
+        } else if ev.code == KeyCode::PageDown {
+            self.scroll(self.view_height as isize);
         } else {
             self.repo_filter_input.handle_event(&Event::Key(ev));
         }
@@ -44,21 +58,85 @@ impl Presenter {
         false
     }
 
-    pub fn filtered_repos(&self) -> impl Iterator<Item = &LocalRepo> {
+    fn scroll(&mut self, offset: isize) {
+        let (filtered_repos, u_selected) = self.filtered_repos();
+        if !filtered_repos.is_empty() {
+            let filtered_repos_len = filtered_repos.len();
+
+            let u_scrolled = match u_selected {
+                Some(u_selected) => {
+                    constrained_by((u_selected as isize) + offset, filtered_repos_len)
+                }
+                None => constrained_by(offset, filtered_repos_len),
+            };
+
+            let u_view_scrolled = match self.selected.as_ref() {
+                Some(selected) => {
+                    let u_selected = u_selected.unwrap();
+                    let i_view = selected.u_view as isize;
+                    if u_scrolled > u_selected
+                        && selected.u_view + u_scrolled - u_selected < self.view_height
+                    {
+                        selected.u_view + (u_scrolled - u_selected)
+                    } else if i_view + offset >= 0 && i_view + offset < self.view_height as isize {
+                        (i_view + offset) as usize
+                    } else {
+                        selected.u_view
+                    }
+                }
+
+                None => {
+                    if offset < 0 {
+                        0
+                    } else {
+                        let offset = offset as usize;
+                        if offset < self.view_height {
+                            offset
+                        } else {
+                            0
+                        }
+                    }
+                }
+            };
+
+            self.selected = Some(Selected::new(
+                filtered_repos[u_scrolled].path.clone(),
+                min(u_view_scrolled, u_scrolled),
+            ));
+        }
+    }
+
+    fn filtered_repos(&self) -> (Vec<&LocalRepo>, Option<usize>) {
         let filters = self
             .repo_filter_input
             .value()
             .split(' ')
             .collect::<Vec<_>>();
-        self.model
+        let mut u_selected = None;
+        let repos = self
+            .model
             .repos
             .iter()
             .map(|(path, repo)| (path.to_string_lossy(), repo))
             .filter(move |(s, _)| filters.iter().all(|f| s.contains(f)))
-            .map(|(_, repo)| repo)
+            .enumerate()
+            .map(|(i, (_, repo))| {
+                if self
+                    .selected
+                    .as_ref()
+                    .is_some_and(|selected| selected.path == repo.path)
+                {
+                    u_selected = Some(i);
+                }
+
+                repo
+            })
+            .collect();
+
+        (repos, u_selected)
     }
 
-    pub fn render(&self, frame: &mut Frame) {
+    pub fn render(&mut self, frame: &mut Frame) {
         // const DEFAULT_PATH_LEN: u16 = 20u16;
         // let repo_max_len = app
         //     .repos
@@ -87,37 +165,75 @@ impl Presenter {
 
         let layout =
             Layout::vertical(vec![Constraint::Length(1), Constraint::Fill(1)]).split(frame.area());
+        const BORDER_WASTAGE: usize = 2;
+        self.view_height = (layout[1].height as usize).saturating_sub(BORDER_WASTAGE);
 
         frame.render_widget(
             Paragraph::new(self.repo_filter_input.to_string()),
             layout[0],
         );
 
-        let filtered_repos = self.filtered_repos().collect::<Vec<_>>();
+        let (filtered_repos, u_selected) = self.filtered_repos();
         let n_filtered_repos = filtered_repos.len();
+
+        // work out what is visible
+        let max_visible = layout[1].height as usize;
+        let skip = if let Some(u_selected) = u_selected {
+            u_selected - min(self.selected.as_ref().unwrap().u_view, u_selected)
+        } else {
+            0
+        };
+        //         let visible_repos =if filtered_repos.len() > max_visible {
+
+        //
+        // }
+        //             filtered_repos.into_iter().take(max_visible)
+        //  std::iter::empty()
+        //         } else {
+        //             filtered_repos.into_iter().take(max_visible)
+        //         }
 
         let rows = filtered_repos
             .into_iter()
-            .flat_map(|repo| {
-                let repo_path_then_empty =
-                    once(repo.path.to_string_lossy()).chain(repeat(Cow::Borrowed("")));
-                repo_path_then_empty
-                    .zip(repo.remotes.iter())
-                    .map(|(path, remote)| {
-                        Row::new([
-                            path,
-                            Cow::Borrowed(remote.name()),
-                            Cow::Borrowed(remote.url()),
-                        ])
-                    })
+            .enumerate()
+            .skip(skip)
+            .take(max_visible)
+            .map(|(i, repo)| {
+                let modifier = if u_selected.is_some_and(|selected| i == selected) {
+                    Modifier::REVERSED
+                } else {
+                    Modifier::default()
+                };
+                Row::new([
+                    repo.path.to_string_lossy(),
+                    Cow::Owned(repo.remotes.len().to_string()),
+                    Cow::Borrowed(""),
+                ])
+                .style(modifier)
             })
             .collect::<Vec<_>>();
+        // let _rows_with_remotes = filtered_repos
+        //     .into_iter()
+        //     .flat_map(|repo| {
+        //         let repo_path_then_empty =
+        //             once(repo.path.to_string_lossy()).chain(repeat(Cow::Borrowed("")));
+        //         repo_path_then_empty
+        //             .zip(repo.remotes.iter())
+        //             .map(|(path, remote)| {
+        //                 Row::new([
+        //                     path,
+        //                     Cow::Borrowed(remote.name()),
+        //                     Cow::Borrowed(remote.url()),
+        //                 ])
+        //             })
+        //     })
+        //     .collect::<Vec<_>>();
 
         frame.render_widget(
             Table::new(rows, widths).block(
                 Block::bordered()
                     .title(format!(
-                        " showing {}/{} local repos ",
+                        " filtered {}/{} local repos ",
                         n_filtered_repos,
                         self.model.repos.len()
                     ))
@@ -127,14 +243,43 @@ impl Presenter {
             layout[1],
         )
     }
+
+    fn model_updated(&mut self) {
+        // if self.selected.is_none() {
+        //     self.selected = self
+        //         .model
+        //         .repos
+        //         .first_key_value()
+        //         .map(|(path, _repo)| Selected::new(path.clone(), 0));
+        // }
+    }
 }
 
 impl UpdateModel for Presenter {
     fn add_local_repo(&mut self, repo: LocalRepo) {
         self.model.add_local_repo(repo);
+        self.model_updated();
+    }
+}
+
+#[derive(Debug)]
+struct Selected {
+    path: PathBuf,
+    u_view: usize,
+}
+
+impl Selected {
+    fn new(path: PathBuf, u_view: usize) -> Self {
+        Self { path, u_view }
     }
 }
 
 fn is_quit(key_event: &KeyEvent) -> bool {
     matches!(key_event.code, KeyCode::Char('c') | KeyCode::Char('C') if key_event.modifiers == KeyModifiers::CONTROL)
+}
+
+/// constrain i in [0, limit), panic if limit is zero
+fn constrained_by(i: isize, limit: usize) -> usize {
+    assert!(limit > 0);
+    min(max(0, i) as usize, limit - 1)
 }
