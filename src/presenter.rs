@@ -16,7 +16,10 @@ use std::{
 };
 use tui_input::{backend::crossterm::EventHandler, Input};
 
-use crate::model::{LocalRepo, Model, UpdateModel};
+use crate::{
+    model::{LocalRepo, Model, UpdateModel},
+    util::common_prefix,
+};
 
 #[derive(Debug)]
 pub struct Presenter {
@@ -184,6 +187,7 @@ impl Presenter {
             Constraint::Ratio(1, 2),
         ];
 
+        let mut previous_display_path = None;
         let rows = filtered_repos
             .into_iter()
             .enumerate()
@@ -195,8 +199,23 @@ impl Presenter {
                 } else {
                     Modifier::default()
                 };
+                let display_path = self.display_path(&repo.path);
+                let trimmed_display_path = if let Some(previous) = &previous_display_path {
+                    let n = common_prefix::len(previous, &display_path);
+                    if n > 0 {
+                        let mut trimmed = " ".repeat(n);
+                        trimmed.push_str(&display_path[n..]);
+                        Cow::Owned(trimmed)
+                    } else {
+                        display_path.clone()
+                    }
+                } else {
+                    display_path.clone()
+                };
+                previous_display_path = Some(display_path.clone());
+
                 Row::new([
-                    self.display_path(&repo.path),
+                    trimmed_display_path,
                     Cow::Owned(repo.remotes.len().to_string()),
                     Cow::Borrowed(""),
                 ])

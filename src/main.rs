@@ -84,3 +84,4 @@ pub mod service;
 pub mod ssh; // ssh remote traversal
 pub mod template;
 pub mod tui;
+pub mod util;
