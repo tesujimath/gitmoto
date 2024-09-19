@@ -22,13 +22,16 @@ pin-project = "1.1.5"
 ratatui = "0.28.1"
 russh = { version = "0.45.0", features = ["openssl"] }
 russh-sftp = "2.0.3"
+serde = { version = "1.0.210", features = ["derive"] }
 shellexpand = "3.1.0"
 subprocess = "0.2.9"
 tokio = { version = "1.32.0", features = ["full"] }
 tokio-stream = { version = "0.1.15", features = ["fs"] }
+toml = "0.8.19"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 tui-input = "0.10.1"
+xdg = "2.5.2"
 
 [dev-dependencies]
 test-case = "3.3.1"

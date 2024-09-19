@@ -1,23 +1,5 @@
 use std::{collections::HashMap, fmt::Display};
 
-#[derive(PartialEq, Debug)]
-pub enum Error {
-    UnknownFormatCharacter(char),
-    TrailingPercent,
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use Error::*;
-        match self {
-            UnknownFormatCharacter(c) => write!(f, "Unknown format character {}", c),
-            TrailingPercent => f.write_str("Malformed percent sequence at end of string"),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
-
 /// Simple percent-oriented templating, where percent followed by any character is
 /// subtituted by the corresponding string from values.
 pub fn format<S1, S2>(format_str: S1, values: HashMap<char, S2>) -> Result<String, Error>
@@ -79,3 +61,21 @@ mod tests {
         assert_eq!(format(format_str, values), expected.map(|s| s.to_string()));
     }
 }
+
+#[derive(PartialEq, Debug)]
+pub enum Error {
+    UnknownFormatCharacter(char),
+    TrailingPercent,
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use Error::*;
+        match self {
+            UnknownFormatCharacter(c) => write!(f, "Unknown format character {}", c),
+            TrailingPercent => f.write_str("Malformed percent sequence at end of string"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}

@@ -17,6 +17,7 @@ use std::{
 use tui_input::{backend::crossterm::EventHandler, Input};
 
 use crate::{
+    config::DisplayConfig,
     model::{LocalRepo, Model, UpdateModel},
     util::common_prefix,
 };
@@ -145,7 +146,7 @@ impl Presenter {
         (repos, u_selected)
     }
 
-    pub fn render(&mut self, frame: &mut Frame) {
+    pub fn render(&mut self, frame: &mut Frame, config: &DisplayConfig) {
         let main_layout =
             Layout::vertical(vec![Constraint::Length(1), Constraint::Fill(1)]).split(frame.area());
         let repo_layout = Layout::horizontal(vec![Constraint::Length(1), Constraint::Fill(1)])
@@ -200,7 +201,7 @@ impl Presenter {
                     Modifier::default()
                 };
                 let display_path = self.display_path(&repo.path);
-                let (trimmed_display_path, len) =
+                let (collapsed_display_path, len) =
                     if let Some((previous_path, previous_len)) = &previous_display {
                         let n = common_prefix::len_ending(
                             previous_path.chars(),
@@ -208,9 +209,9 @@ impl Presenter {
                             |c| c == &'/',
                         );
                         if n > 0 && n >= *previous_len {
-                            let mut trimmed = " ".repeat(n);
-                            trimmed.push_str(&display_path[n..]);
-                            (Cow::Owned(trimmed), n)
+                            let mut collapsed = " ".repeat(n);
+                            collapsed.push_str(&display_path[n..]);
+                            (Cow::Owned(collapsed), n)
                         } else {
                             (display_path.clone(), 0)
                         }
@@ -220,7 +221,11 @@ impl Presenter {
                 previous_display = Some((display_path.clone(), len));
 
                 Row::new([
-                    /*trimmed_*/ display_path, // TODO make it configurable which we use
+                    if config.collapse_paths {
+                        collapsed_display_path
+                    } else {
+                        display_path
+                    },
                     Cow::Owned(repo.remotes.len().to_string()),
                     Cow::Borrowed(""),
                 ])

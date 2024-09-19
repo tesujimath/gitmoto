@@ -48,9 +48,8 @@
             ];
 
             shellHook = ''
-              export GITMOTO_CONFIG=`pwd`/.config
-              export GITMOTO_DATA=`pwd`/.data
-              export GITMOTO_LOG_LEVEL=debug
+              export GITMOTO_CONFIG=`pwd`/etc/gitmoto.toml
+              export RUST_LOG=trace
             '';
           };
         }

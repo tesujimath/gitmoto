@@ -1,4 +1,5 @@
 use anyhow::Result;
+use config::read_config;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{fs::OpenOptions, io};
 use tokio::select;
@@ -30,6 +31,8 @@ async fn main() -> Result<()> {
     trace!("                    STARTING");
     trace!("");
 
+    let config = read_config().expect("Failed to read config");
+
     // Create an application.
     let mut presenter = Presenter::default();
 
@@ -52,7 +55,7 @@ async fn main() -> Result<()> {
     let mut running = true;
     while running {
         // Render the user interface.
-        tui.draw(|frame| presenter.render(frame))?;
+        tui.draw(|frame| presenter.render(frame, &config.display))?;
         // Handle events.
         select! {
             ev = terminal_service.recv_event()  => {
@@ -77,6 +80,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+pub mod config;
 pub mod github; // GitHub API
 pub mod model;
 pub mod presenter;

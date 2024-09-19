@@ -1,0 +1,19 @@
+[filesystem.scanner]
+rootdirs = ["~"]
+excludes = [
+  "~/Downloads/**",
+  "~/junk/**",
+  "~/share/**",
+  "**/.cargo",
+  "**/.psc-package",
+  "**/.spago",
+  "**/go/pkg/dep",
+  "**/go/src",
+]
+
+[display]
+collapse-paths = true
+
+[git-client]
+command = "emacsclient"
+args = ["--create-frame", "--eval", "(magit-status \"{}\")"]
