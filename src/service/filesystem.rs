@@ -18,7 +18,7 @@ use tracing::{error, warn};
 use crate::model::{LocalRepo, Remote};
 
 pub enum Request {
-    Scan(PathBuf),
+    Scan(String),
 }
 
 pub enum Event {
@@ -69,6 +69,7 @@ async fn worker(mut request_rx: mpsc::Receiver<Request>, event_tx: mpsc::Sender<
 
         match request {
             Scan(rootdir) => {
+                let rootdir = PathBuf::from(shellexpand::tilde(&rootdir).into_owned());
                 let mut pending_dirs = VecDeque::from([rootdir]);
 
                 while let Some(dir) = pending_dirs.pop_front() {

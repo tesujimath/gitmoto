@@ -1,6 +1,6 @@
 use anyhow::Result;
 use ratatui::{backend::CrosstermBackend, Terminal};
-use std::{fs::OpenOptions, io, path::PathBuf};
+use std::{fs::OpenOptions, io};
 use tokio::select;
 use tracing::trace;
 use tracing_subscriber::EnvFilter;
@@ -44,7 +44,7 @@ async fn main() -> Result<()> {
     let filesystem_requester = filesystem_service.requester();
 
     filesystem_requester
-        .send(filesystem::Request::Scan(PathBuf::from("/home/sjg/vc")))
+        .send(filesystem::Request::Scan("~/vc".to_string()))
         .await
         .unwrap();
 

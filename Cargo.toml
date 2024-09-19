@@ -11,6 +11,7 @@ anyhow = "1.0.86"
 async-stream = "0.3.5"
 async-trait = "0.1.81"
 crossterm = { version = "0.28.1", features = ["event-stream"] }
+dirs = "5.0.1"
 futures = "0.3.28"
 futures-util = "0.3.30"
 gix = "0.66.0"
@@ -21,6 +22,7 @@ pin-project = "1.1.5"
 ratatui = "0.28.1"
 russh = { version = "0.45.0", features = ["openssl"] }
 russh-sftp = "2.0.3"
+shellexpand = "3.1.0"
 subprocess = "0.2.9"
 tokio = { version = "1.32.0", features = ["full"] }
 tokio-stream = { version = "0.1.15", features = ["fs"] }

@@ -1,4 +1,5 @@
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use dirs::home_dir;
 use ratatui::{
     layout::{Alignment, Constraint, Layout, Margin},
     style::Modifier,
@@ -11,7 +12,7 @@ use std::{
     borrow::Cow,
     cmp::{max, min},
     default::Default,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 use tui_input::{backend::crossterm::EventHandler, Input};
 
@@ -19,6 +20,7 @@ use crate::model::{LocalRepo, Model, UpdateModel};
 
 #[derive(Debug)]
 pub struct Presenter {
+    home_dir: Option<String>,
     model: Model,
     repo_filter_input: Input,
     view_height: usize,
@@ -29,6 +31,7 @@ impl Default for Presenter {
     fn default() -> Self {
         let model = Model::default();
         Self {
+            home_dir: home_dir().map(|p| p.to_string_lossy().into_owned()),
             model,
             repo_filter_input: Input::default(),
             view_height: 1,
@@ -193,7 +196,7 @@ impl Presenter {
                     Modifier::default()
                 };
                 Row::new([
-                    repo.path.to_string_lossy(),
+                    self.display_path(&repo.path),
                     Cow::Owned(repo.remotes.len().to_string()),
                     Cow::Borrowed(""),
                 ])
@@ -224,6 +227,16 @@ impl Presenter {
             ),
             repo_layout[1],
         )
+    }
+
+    fn display_path<'a>(&self, path: &'a Path) -> Cow<'a, str> {
+        let path = path.to_string_lossy();
+        if let Some(home_dir) = self.home_dir.as_ref() {
+            if path.starts_with(home_dir) {
+                return Cow::Owned(path.replacen(home_dir, "~", 1));
+            }
+        }
+        path
     }
 
     // TODO - this shouldn't be inline perhaps?
