@@ -187,7 +187,7 @@ impl Presenter {
             Constraint::Ratio(1, 2),
         ];
 
-        let mut previous_display_path = None;
+        let mut previous_display_path: Option<Cow<str>> = None;
         let rows = filtered_repos
             .into_iter()
             .enumerate()
@@ -201,7 +201,10 @@ impl Presenter {
                 };
                 let display_path = self.display_path(&repo.path);
                 let trimmed_display_path = if let Some(previous) = &previous_display_path {
-                    let n = common_prefix::len(previous, &display_path);
+                    let n =
+                        common_prefix::len_ending(previous.chars(), display_path.chars(), |c| {
+                            c == &'/'
+                        });
                     if n > 0 {
                         let mut trimmed = " ".repeat(n);
                         trimmed.push_str(&display_path[n..]);
