@@ -27,3 +27,6 @@ tokio-stream = { version = "0.1.15", features = ["fs"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 tui-input = "0.10.1"
+
+[dev-dependencies]
+test-case = "3.3.1"

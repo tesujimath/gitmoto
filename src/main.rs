@@ -82,4 +82,5 @@ pub mod model;
 pub mod presenter;
 pub mod service;
 pub mod ssh; // ssh remote traversal
+pub mod template;
 pub mod tui;
