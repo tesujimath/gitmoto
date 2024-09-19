@@ -1,5 +1,5 @@
 [filesystem.scanner]
-rootdirs = ["~"]
+roots = ["~/vc"]
 excludes = [
   "~/Downloads/**",
   "~/junk/**",

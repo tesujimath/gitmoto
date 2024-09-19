@@ -1,7 +1,7 @@
 use anyhow::Result;
 use config::read_config;
 use ratatui::{backend::CrosstermBackend, Terminal};
-use std::{fs::OpenOptions, io};
+use std::{fs::OpenOptions, io, process::exit};
 use tokio::select;
 use tracing::trace;
 use tracing_subscriber::EnvFilter;
@@ -46,10 +46,18 @@ async fn main() -> Result<()> {
     let mut filesystem_service = filesystem::Service::default();
     let filesystem_requester = filesystem_service.requester();
 
-    filesystem_requester
-        .send(filesystem::Request::Scan("~/vc".to_string()))
-        .await
-        .unwrap();
+    let roots = &config.filesystem.scanner.roots;
+    if roots.is_empty() {
+        eprintln!("no filesystem scanner roots found in config, abort");
+        exit(1);
+    }
+
+    for root in roots {
+        filesystem_requester
+            .send(filesystem::Request::Scan(root.clone()))
+            .await
+            .unwrap();
+    }
 
     // Start the main loop.
     let mut running = true;

@@ -6,7 +6,22 @@ use tracing::debug;
 #[serde(default)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
+    pub filesystem: FilesystemConfig,
     pub display: DisplayConfig,
+}
+
+#[derive(Default, Deserialize, Debug)]
+#[serde(default)]
+#[serde(rename_all = "kebab-case")]
+pub struct FilesystemConfig {
+    pub scanner: FilesystemScannerConfig,
+}
+
+#[derive(Default, Deserialize, Debug)]
+#[serde(default)]
+#[serde(rename_all = "kebab-case")]
+pub struct FilesystemScannerConfig {
+    pub roots: Vec<String>,
 }
 
 #[derive(Default, Deserialize, Debug)]
