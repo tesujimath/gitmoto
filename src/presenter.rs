@@ -187,7 +187,7 @@ impl Presenter {
             Constraint::Ratio(1, 2),
         ];
 
-        let mut previous_display_path: Option<Cow<str>> = None;
+        let mut previous_display: Option<(Cow<str>, usize)> = None;
         let rows = filtered_repos
             .into_iter()
             .enumerate()
@@ -200,25 +200,27 @@ impl Presenter {
                     Modifier::default()
                 };
                 let display_path = self.display_path(&repo.path);
-                let trimmed_display_path = if let Some(previous) = &previous_display_path {
-                    let n =
-                        common_prefix::len_ending(previous.chars(), display_path.chars(), |c| {
-                            c == &'/'
-                        });
-                    if n > 0 {
-                        let mut trimmed = " ".repeat(n);
-                        trimmed.push_str(&display_path[n..]);
-                        Cow::Owned(trimmed)
+                let (trimmed_display_path, len) =
+                    if let Some((previous_path, previous_len)) = &previous_display {
+                        let n = common_prefix::len_ending(
+                            previous_path.chars(),
+                            display_path.chars(),
+                            |c| c == &'/',
+                        );
+                        if n > 0 && n >= *previous_len {
+                            let mut trimmed = " ".repeat(n);
+                            trimmed.push_str(&display_path[n..]);
+                            (Cow::Owned(trimmed), n)
+                        } else {
+                            (display_path.clone(), 0)
+                        }
                     } else {
-                        display_path.clone()
-                    }
-                } else {
-                    display_path.clone()
-                };
-                previous_display_path = Some(display_path.clone());
+                        (display_path.clone(), 0)
+                    };
+                previous_display = Some((display_path.clone(), len));
 
                 Row::new([
-                    trimmed_display_path,
+                    /*trimmed_*/ display_path, // TODO make it configurable which we use
                     Cow::Owned(repo.remotes.len().to_string()),
                     Cow::Borrowed(""),
                 ])
