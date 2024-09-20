@@ -1,9 +1,10 @@
 [filesystem.scanner]
-roots = ["~/vc"]
+roots = ["~"]
 excludes = [
+  "~/.cache",
+  "~/.local",
   "~/Downloads/**",
   "~/junk/**",
-  "~/share/**",
   "**/.cargo",
   "**/.psc-package",
   "**/.spago",

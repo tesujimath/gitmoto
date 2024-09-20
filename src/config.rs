@@ -1,4 +1,5 @@
-use serde::Deserialize;
+use globset::{Glob, GlobSet};
+use serde::{de, Deserialize, Deserializer};
 use std::{env, fmt::Display, fs::read_to_string, io, path::PathBuf};
 use tracing::debug;
 
@@ -10,18 +11,20 @@ pub struct Config {
     pub display: DisplayConfig,
 }
 
-#[derive(Default, Deserialize, Debug)]
+#[derive(Clone, Default, Deserialize, Debug)]
 #[serde(default)]
 #[serde(rename_all = "kebab-case")]
 pub struct FilesystemConfig {
     pub scanner: FilesystemScannerConfig,
 }
 
-#[derive(Default, Deserialize, Debug)]
+#[derive(Clone, Default, Deserialize, Debug)]
 #[serde(default)]
 #[serde(rename_all = "kebab-case")]
 pub struct FilesystemScannerConfig {
     pub roots: Vec<String>,
+    #[serde(deserialize_with = "deserialize_globset")]
+    pub excludes: GlobSet,
 }
 
 #[derive(Default, Deserialize, Debug)]
@@ -34,6 +37,17 @@ pub struct DisplayConfig {
 
 fn default_collapse_paths() -> bool {
     true
+}
+
+fn deserialize_globset<'de, D>(deserializer: D) -> Result<GlobSet, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let mut globset_builder = GlobSet::builder();
+    for glob_str in Vec::<String>::deserialize(deserializer)? {
+        globset_builder.add(Glob::new(&shellexpand::tilde(&glob_str)).map_err(de::Error::custom)?);
+    }
+    globset_builder.build().map_err(de::Error::custom)
 }
 
 pub fn read_config() -> Result<Config, Error> {
@@ -49,7 +63,8 @@ pub fn read_config() -> Result<Config, Error> {
 
             let raw_config = read_to_string(&config_path).map_err(Error::Io)?;
             let config: Config = toml::from_str(&raw_config).map_err(Error::TomlDecode)?;
-            Ok(config)
+
+            valid_config(config)
         }
         None => {
             debug!("no config file, using defaults");
@@ -58,11 +73,20 @@ pub fn read_config() -> Result<Config, Error> {
     }
 }
 
+fn valid_config(c: Config) -> Result<Config, Error> {
+    if c.filesystem.scanner.roots.is_empty() {
+        Err(Error::EmptyFilesystemScannerRoots)?
+    }
+
+    Ok(c)
+}
+
 #[derive(Debug)]
 pub enum Error {
     Io(io::Error),
     TomlDecode(toml::de::Error),
     XdgBaseDirectories(xdg::BaseDirectoriesError),
+    EmptyFilesystemScannerRoots,
 }
 
 impl Display for Error {
@@ -72,6 +96,7 @@ impl Display for Error {
             Io(e) => write!(f, "I/O error {}", e),
             TomlDecode(e) => write!(f, "TOML decode error {}", e),
             XdgBaseDirectories(e) => write!(f, "XDG error {}", e),
+            EmptyFilesystemScannerRoots => f.write_str("missing filesystem scanner roots"),
         }
     }
 }

@@ -13,12 +13,15 @@ use tokio::{
     task::spawn_blocking,
 };
 use tokio_stream::wrappers::ReadDirStream;
-use tracing::{error, warn};
+use tracing::{error, trace, warn};
 
-use crate::model::{LocalRepo, Remote};
+use crate::{
+    config::FilesystemConfig,
+    model::{LocalRepo, Remote},
+};
 
 pub enum Request {
-    Scan(String),
+    Scan,
 }
 
 pub enum Event {
@@ -30,21 +33,19 @@ pub struct Service {
     request_tx: mpsc::Sender<Request>,
 }
 
-impl Default for Service {
-    fn default() -> Self {
+impl Service {
+    pub fn new(config: &FilesystemConfig) -> Self {
         let (event_tx, event_rx) = mpsc::channel(1);
         let (request_tx, request_rx) = mpsc::channel(1);
 
-        tokio::spawn(worker(request_rx, event_tx));
+        tokio::spawn(worker(config.clone(), request_rx, event_tx));
 
         Self {
             event_rx,
             request_tx,
         }
     }
-}
 
-impl Service {
     pub fn requester(&self) -> mpsc::Sender<Request> {
         self.request_tx.clone()
     }
@@ -63,29 +64,42 @@ impl Service {
     }
 }
 
-async fn worker(mut request_rx: mpsc::Receiver<Request>, event_tx: mpsc::Sender<Event>) {
+async fn worker(
+    config: FilesystemConfig,
+    mut request_rx: mpsc::Receiver<Request>,
+    event_tx: mpsc::Sender<Event>,
+) {
     while let Some(request) = request_rx.recv().await {
         use Request::*;
 
         match request {
-            Scan(rootdir) => {
-                let rootdir = PathBuf::from(shellexpand::tilde(&rootdir).into_owned());
-                let mut pending_dirs = VecDeque::from([rootdir]);
+            Scan => {
+                let mut pending_dirs = config
+                    .scanner
+                    .roots
+                    .iter()
+                    .map(|rootdir| PathBuf::from(shellexpand::tilde(&rootdir).into_owned()))
+                    .collect::<VecDeque<_>>();
 
                 while let Some(dir) = pending_dirs.pop_front() {
-                    let git_dir = dir.join(".git");
+                    let excluded = config.scanner.excludes.is_match(&dir);
+                    trace!("considering {:?}", &dir);
+                    if !excluded {
+                        trace!("included {:?}", &dir);
+                        let git_dir = dir.join(".git");
 
-                    if is_primary_git_worktree(&git_dir).await {
-                        let remotes = git_remotes(git_dir).await;
-                        let repo = LocalRepo::new(dir, remotes);
-                        event_tx.send(Event::LocalRepo(repo)).await.unwrap();
-                    } else {
-                        match read_subdirs(&dir).await {
-                            Ok(subdirs) => {
-                                pending_dirs.extend(subdirs);
-                            }
-                            Err(e) => {
-                                error!("read_subdirs: {}", e)
+                        if is_primary_git_worktree(&git_dir).await {
+                            let remotes = git_remotes(git_dir).await;
+                            let repo = LocalRepo::new(dir, remotes);
+                            event_tx.send(Event::LocalRepo(repo)).await.unwrap();
+                        } else {
+                            match read_subdirs(&dir).await {
+                                Ok(subdirs) => {
+                                    pending_dirs.extend(subdirs);
+                                }
+                                Err(e) => {
+                                    error!("read_subdirs: {}", e)
+                                }
                             }
                         }
                     }

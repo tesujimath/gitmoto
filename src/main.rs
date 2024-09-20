@@ -43,7 +43,7 @@ async fn main() -> Result<()> {
     tui.init()?;
 
     let mut terminal_service = terminal::Service::default();
-    let mut filesystem_service = filesystem::Service::default();
+    let mut filesystem_service = filesystem::Service::new(&config.filesystem);
     let filesystem_requester = filesystem_service.requester();
 
     let roots = &config.filesystem.scanner.roots;
@@ -52,12 +52,11 @@ async fn main() -> Result<()> {
         exit(1);
     }
 
-    for root in roots {
-        filesystem_requester
-            .send(filesystem::Request::Scan(root.clone()))
-            .await
-            .unwrap();
-    }
+    // initial filesystem scan, TODO read from cache
+    filesystem_requester
+        .send(filesystem::Request::Scan)
+        .await
+        .unwrap();
 
     // Start the main loop.
     let mut running = true;
