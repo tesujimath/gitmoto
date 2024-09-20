@@ -2,7 +2,11 @@
 name = "gitmoto"
 version = "0.1.0"
 edition = "2021"
+license = "MIT OR Apache-2.0"
 description = "TUI for git remote management"
+homepage = "https://github.com/tesujimath/gitmoto"
+repository = "https://github.com/tesujimath/gitmoto"
+readme = "README.md"
 
 authors = ["Simon Guest <simon.guest@tesujimath.org>"]
 
