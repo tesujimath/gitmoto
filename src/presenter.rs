@@ -17,13 +17,14 @@ use std::{
 use tui_input::{backend::crossterm::EventHandler, Input};
 
 use crate::{
-    config::DisplayConfig,
+    config::Config,
     model::{LocalRepo, Model, UpdateModel},
     util::common_prefix,
 };
 
 #[derive(Debug)]
 pub struct Presenter {
+    config: Config,
     home_dir: Option<String>,
     model: Model,
     repo_filter_input: Input,
@@ -31,10 +32,11 @@ pub struct Presenter {
     selected: Option<Selected>,
 }
 
-impl Default for Presenter {
-    fn default() -> Self {
+impl Presenter {
+    pub fn new(config: &Config) -> Self {
         let model = Model::default();
         Self {
+            config: config.clone(),
             home_dir: home_dir().map(|p| p.to_string_lossy().into_owned()),
             model,
             repo_filter_input: Input::default(),
@@ -42,9 +44,7 @@ impl Default for Presenter {
             selected: None,
         }
     }
-}
 
-impl Presenter {
     pub fn handle_key(&mut self, ev: KeyEvent) -> bool {
         if is_quit(&ev) {
             return true;
@@ -146,7 +146,7 @@ impl Presenter {
         (repos, u_selected)
     }
 
-    pub fn render(&mut self, frame: &mut Frame, config: &DisplayConfig) {
+    pub fn render(&mut self, frame: &mut Frame) {
         let main_layout =
             Layout::vertical(vec![Constraint::Length(1), Constraint::Fill(1)]).split(frame.area());
         let repo_layout = Layout::horizontal(vec![Constraint::Length(1), Constraint::Fill(1)])
@@ -221,7 +221,7 @@ impl Presenter {
                 previous_display = Some((display_path.clone(), len));
 
                 Row::new([
-                    if config.collapse_paths {
+                    if self.config.view.collapse_paths {
                         collapsed_display_path
                     } else {
                         display_path
@@ -272,11 +272,20 @@ impl Presenter {
     fn open_git_client(&mut self) {
         if let Some(selected) = self.selected.as_ref() {
             let path = selected.path.canonicalize().unwrap();
-            let magit_status = format!("(magit-status \"{}\")", path.to_string_lossy());
-            std::process::Command::new("emacsclient")
-                .args(["--create-frame", "--eval", &magit_status])
+            let args = self
+                .config
+                .git_client
+                .format_args(path.to_string_lossy())
+                .unwrap(); // was validated when reading config
+            std::process::Command::new(&self.config.git_client.command)
+                .args(args)
                 .spawn()
-                .expect("Failed to spawn emacsclient");
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "Failed to spawn git client {}: {}",
+                        self.config.git_client.command, e
+                    )
+                });
         }
     }
 

@@ -32,11 +32,8 @@ async fn main() -> Result<()> {
     trace!("");
 
     let config = read_config().expect("Failed to read config");
+    let mut presenter = Presenter::new(&config);
 
-    // Create an application.
-    let mut presenter = Presenter::default();
-
-    // Initialize the terminal user interface.
     let backend = CrosstermBackend::new(io::stdout());
     let terminal = Terminal::new(backend)?;
     let mut tui = Tui::new(terminal);
@@ -62,7 +59,7 @@ async fn main() -> Result<()> {
     let mut running = true;
     while running {
         // Render the user interface.
-        tui.draw(|frame| presenter.render(frame, &config.display))?;
+        tui.draw(|frame| presenter.render(frame))?;
         // Handle events.
         select! {
             ev = terminal_service.recv_event()  => {

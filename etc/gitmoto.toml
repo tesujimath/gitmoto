@@ -12,9 +12,9 @@ excludes = [
   "**/go/src",
 ]
 
-[display]
+[view]
 collapse-paths = true
 
 [git-client]
 command = "emacsclient"
-args = ["--create-frame", "--eval", "(magit-status \"{}\")"]
+args = ["--create-frame", "--eval", "(magit-status \"%f\")"]

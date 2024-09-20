@@ -1,14 +1,17 @@
 use globset::{Glob, GlobSet};
 use serde::{de, Deserialize, Deserializer};
-use std::{env, fmt::Display, fs::read_to_string, io, path::PathBuf};
+use std::{collections::HashMap, env, fmt::Display, fs::read_to_string, io, path::PathBuf};
 use tracing::debug;
 
-#[derive(Default, Deserialize, Debug)]
+use crate::template;
+
+#[derive(Clone, Default, Deserialize, Debug)]
 #[serde(default)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
     pub filesystem: FilesystemConfig,
-    pub display: DisplayConfig,
+    pub view: ViewConfig,
+    pub git_client: GitClientConfig,
 }
 
 #[derive(Clone, Default, Deserialize, Debug)]
@@ -27,12 +30,33 @@ pub struct FilesystemScannerConfig {
     pub excludes: GlobSet,
 }
 
-#[derive(Default, Deserialize, Debug)]
+#[derive(Clone, Default, Deserialize, Debug)]
 #[serde(default)]
 #[serde(rename_all = "kebab-case")]
-pub struct DisplayConfig {
+pub struct ViewConfig {
     #[serde(default = "default_collapse_paths")]
     pub collapse_paths: bool,
+}
+
+#[derive(Clone, Default, Deserialize, Debug)]
+#[serde(default)]
+#[serde(rename_all = "kebab-case")]
+pub struct GitClientConfig {
+    pub command: String,
+    pub args: Vec<String>,
+}
+
+impl GitClientConfig {
+    pub fn format_args<S>(&self, f: S) -> Result<Vec<String>, Error>
+    where
+        S: AsRef<str>,
+    {
+        let template_params = [('f', f)].into_iter().collect::<HashMap<_, _>>();
+        self.args
+            .iter()
+            .map(|arg| template::format(arg, &template_params).map_err(Error::GitClientTemplate))
+            .collect::<Result<Vec<_>, Error>>()
+    }
 }
 
 fn default_collapse_paths() -> bool {
@@ -78,6 +102,8 @@ fn valid_config(c: Config) -> Result<Config, Error> {
         Err(Error::EmptyFilesystemScannerRoots)?
     }
 
+    c.git_client.format_args("dummy/path")?;
+
     Ok(c)
 }
 
@@ -87,6 +113,7 @@ pub enum Error {
     TomlDecode(toml::de::Error),
     XdgBaseDirectories(xdg::BaseDirectoriesError),
     EmptyFilesystemScannerRoots,
+    GitClientTemplate(template::Error),
 }
 
 impl Display for Error {
@@ -97,6 +124,7 @@ impl Display for Error {
             TomlDecode(e) => write!(f, "TOML decode error {}", e),
             XdgBaseDirectories(e) => write!(f, "XDG error {}", e),
             EmptyFilesystemScannerRoots => f.write_str("missing filesystem scanner roots"),
+            GitClientTemplate(e) => write!(f, "Git client template error {}", e),
         }
     }
 }

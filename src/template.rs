@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt::Display};
 
 /// Simple percent-oriented templating, where percent followed by any character is
 /// subtituted by the corresponding string from values.
-pub fn format<S1, S2>(format_str: S1, values: HashMap<char, S2>) -> Result<String, Error>
+pub fn format<S1, S2>(format_str: S1, values: &HashMap<char, S2>) -> Result<String, Error>
 where
     S1: AsRef<str>,
     S2: AsRef<str>,
@@ -58,7 +58,7 @@ mod tests {
         I: IntoIterator<Item = (char, &'i str)>,
     {
         let values = HashMap::from_iter(values);
-        assert_eq!(format(format_str, values), expected.map(|s| s.to_string()));
+        assert_eq!(format(format_str, &values), expected.map(|s| s.to_string()));
     }
 }
 
