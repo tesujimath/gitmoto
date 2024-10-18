@@ -1,8 +1,8 @@
 # gitmoto
 
-[![CI](https://github.com//gitmoto/workflows/CI/badge.svg)](https://github.com//gitmoto/actions)
-
 TUI for git multiple repo and remote management
+
+<img src="https://raw.githubusercontent.com/tesujimath/gitmoto/main/examples/images/gitmoto-early-screenshot.png" alt="Early screenshot of gitmoto"/>
 
 ## Current status
 
